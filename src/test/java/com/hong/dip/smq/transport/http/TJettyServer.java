@@ -19,34 +19,14 @@ public class TJettyServer {
 		//options.setMaxIdleTime(5000);
 		JettyServer server = new JettyServer(options);
 		server.start();
-		server.addServant("/queue/*", new TestHandler());
+		server.addServant("/queue/a", new TestHandler());
+		server.addServant("/queue/b", new TestHandler());
 		
 		
-		/*
-		server.addServlet("/queue/*", TestServlet.class);
-		server.addServlet("/*", TestServlet2.class);
-		*/
 		server.join();
 
 	}
 
-	public static class TestServlet extends HttpServlet {
-		protected void doGet(HttpServletRequest request, HttpServletResponse response)
-				throws ServletException, IOException {
-			response.setContentType("text/html");
-			response.setStatus(HttpServletResponse.SC_OK);
-			response.getWriter().println("<h1>Hello from HelloServlet " + request.getRequestURI() + ": " + request.getContextPath() + "</h1>");
-		}
-	}
-	public static class TestServlet2 extends HttpServlet {
-		protected void doGet(HttpServletRequest request, HttpServletResponse response)
-				throws ServletException, IOException {
-			response.setContentType("text/html");
-			response.setStatus(HttpServletResponse.SC_OK);
-			response.getWriter().println("<h1>Hello from HelloServlet2 " + request.getRequestURI() + ": " + request.getContextPath() +  "</h1>");
-		}
-	}
-	
 	public static class TestHandler extends AbstractHandler{
 
 		@Override
@@ -55,7 +35,11 @@ public class TJettyServer {
 			
 			response.setContentType("text/html");
 			response.setStatus(HttpServletResponse.SC_OK);
-			response.getWriter().println("<h1>Hello from HelloHandler target=" + target + ":uri=" +  request.getRequestURI() + ": ctx=" + request.getContextPath() + "</h1>");
+			response.getWriter().println("<h1>Hello from HelloHandler target=" + target 
+					+ ":uri=" +  request.getRequestURI() + 
+					": ctx=" + request.getContextPath() + 
+					":method=" + request.getMethod()
+					+ "</h1>");
 			baseRequest.setHandled(true);
 		}
 		

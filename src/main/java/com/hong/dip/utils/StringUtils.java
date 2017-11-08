@@ -1,6 +1,7 @@
 package com.hong.dip.utils;
 
 import java.io.File;
+import java.io.IOException;
 import java.io.UnsupportedEncodingException;
 import java.net.MalformedURLException;
 import java.net.URL;
@@ -220,5 +221,58 @@ public final class StringUtils {
         }
         return servletMap;
     }
+
+	public static int parseInt(String header, int defaultV) {
+		try{
+			return Integer.parseInt(header);
+		}catch(NumberFormatException e){
+			return defaultV;
+		}
+	}
+
+	public static String list2String(List<String> list) {
+		StringBuilder b = new StringBuilder();
+		for(String s : list)
+			b.append(s).append(';');
+		return b.toString();
+	}
+	public static List<String> string2List(String s) {
+		List<String> list = new ArrayList<String>();
+		int start = 0;
+		int occurs = -1;
+		
+		while(start < s.length()){
+			occurs = s.indexOf(';', start);
+			String part = null;
+			if(occurs - start >  0){
+				part = s.substring(start, occurs);
+				
+			}else if(occurs == -1){
+				if(start < s.length()){
+					part = s.substring(start);
+				}
+			}
+			if(!StringUtils.isEmpty(part)){
+				list.add(part);
+			}
+			//continue next part ';'
+			start = occurs < 0 ? s.length() : occurs + 1;
+		}
+		return list;
+	}
+
+	public static void ensureDirExists(File dir) throws IOException{
+		if(dir.exists()){
+			if(dir.isDirectory())
+				return;
+			else
+				throw new IOException(dir + " exists, but it not a directory");
+		}else{
+			if(dir.mkdirs())
+				return;
+			else
+				throw new IOException("Cannot create directory (" + dir + ")");
+		}
+	}
 
 }

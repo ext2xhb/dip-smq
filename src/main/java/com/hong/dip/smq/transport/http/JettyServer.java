@@ -54,10 +54,11 @@ public class JettyServer extends ServiceSupport{
 	}
 	
 	public void addServant(String path, AbstractHandler handler) throws Exception{
-		String contextName = StringUtils.getContextName(path);
-		//String resource = StringUtils.getResourceBase(path);
+		if(path.length() == 0 || path.charAt(0) != '/'){
+			path = "/" + path;
+		}
 		ContextHandler context = new ContextHandler();
-        context.setContextPath(contextName);
+        context.setContextPath(path);
         context.setHandler(handler);
         contexts.addHandler(context);
         
