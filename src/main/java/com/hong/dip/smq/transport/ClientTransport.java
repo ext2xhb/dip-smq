@@ -1,5 +1,14 @@
 package com.hong.dip.smq.transport;
 
-public interface ClientTransport {
+import org.apache.camel.Service;
+
+import com.hong.dip.smq.Node;
+import com.hong.dip.smq.storage.QueueStorage;
+
+public interface ClientTransport extends Service{
+
+	void startMessageSender(Node node, QueueStorage queue);
+
+	void stopMessageSender(QueueStorage queue);
 
 }

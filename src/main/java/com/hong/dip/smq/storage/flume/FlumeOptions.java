@@ -4,8 +4,8 @@ public class FlumeOptions {
 	private String storagePath;
 	private int putWaitSeconds = 3; //time wait for queue space available 
 	private int defaultQueueDepth = 100000;
-	private int chunkSize = 1024; // 大消息的分片大小.单位是K
-	private int transactionCapacity = 1; //transaction内可以保存的最大消息数（未提交）
+	private int chunkSize = 1024*1024; // 大消息的分片大小
+	private int transactionCapacity = 10; //transaction内可以保存的最大消息数（未提交）
 	public FlumeOptions(String storagePath){
 		this.storagePath = storagePath;
 	}

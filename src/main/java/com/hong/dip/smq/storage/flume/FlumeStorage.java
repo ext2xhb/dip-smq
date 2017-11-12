@@ -76,7 +76,7 @@ public class FlumeStorage extends ServiceSupport implements Storage{
 	@Override
 	public QueueStorage getOrCreateQueueStorage(String qname) throws Exception {
 		FlumeQueueStorage  result = 
-				queueStorages.putIfAbsent(qname, new FlumeQueueStorage(this.getQueueAttachmentDir(qname), qname, context));
+				queueStorages.putIfAbsent(qname, new FlumeQueueStorage(options, this.getQueueAttachmentDir(qname), qname, context));
 		
 		if(result == null){
 			result = queueStorages.get(qname);
@@ -107,5 +107,13 @@ public class FlumeStorage extends ServiceSupport implements Storage{
 	protected void doStart() throws Exception {
 		prepareStorageBase(options);
 		context = createContext(options);
+	}
+	@Override
+	public void deleteQueueStorage(String name) {
+		FlumeQueueStorage storage = queueStorages.remove(name);
+		if(storage != null){
+			storage.delete();
+		}
+		
 	}
 }

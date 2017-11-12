@@ -1,100 +1,154 @@
 package com.hong.dip.smq.storage.flume;
 
-import java.io.IOException;
+import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+
+import org.apache.flume.Event;
+import org.apache.flume.event.SimpleEvent;
 
 import com.hong.dip.smq.ChunkableDataSource;
+import com.hong.dip.smq.ChunkableFileDataSource;
 import com.hong.dip.smq.Message;
+import com.hong.dip.smq.SimpleMessage;
 import com.hong.dip.smq.storage.MessageStorage;
+import com.hong.dip.utils.StringUtils;
 
-public class FlumeMessageStorage implements Message, MessageStorage {
-	String msgId;
-
-	byte[] byteBody;
+public class FlumeMessageStorage implements MessageStorage {
+	private static final String HEADER_ID = "id";
+	private static final String HEADER_ATTACHMENT_NAMELIST = "names";
+	private static final String HEADER_ATTACHMENT_PATH = "url";
+	private static final String HEADER_SEQUENCE = "seq";
 	
-	List<String> attachmentNames = new ArrayList<String>();
-	List<ChunkableDataSource> attachments = new ArrayList<ChunkableDataSource>();
+	static MessageStorage cast2Storage(Message m){
+		FlumeMessageStorage storage = new FlumeMessageStorage();
+		
+		Event event = storage.getEvent();
+		Map<String, String> headers = event.getHeaders();
+		//set id && body
+		headers.put(HEADER_ID, m.getID());
+		event.setBody(m.getByteBody());
+		
+		//set attachment if we has
+		StringBuilder names = new StringBuilder();
+		StringBuilder paths = new StringBuilder();
+		for(ChunkableDataSource ds : m.getAttachments()){
+			names.append(ds.getName()).append(';');
+			paths.append(((ChunkableFileDataSource)ds).getFile().getPath()).append(';');
+			storage.addPart(ds);
+		}
+		if(names.length() > 0){
+			headers.put(HEADER_ATTACHMENT_NAMELIST, names.toString());
+			headers.put(HEADER_ATTACHMENT_PATH, paths.toString());
+		}
+		return storage;
+	}
+	
+	static Message cast2Message(MessageStorage storage) {
+		Message m = new SimpleMessage();
+		m.setID(storage.getID());
+		m.setByteBody(((FlumeMessageStorage)storage).getEvent().getBody());
+		
+		List<ChunkableDataSource> parts = storage.getParts();
+		for(int i = 1; i < parts.size(); i++)
+			m.addAttachment(parts.get(i));
+		return m;
+	}
+
+
+	ChunkableEventDataSource body;
+	List<ChunkableDataSource> parts = new ArrayList<ChunkableDataSource>(2);
+	private long storeSequence;
 	
 	FlumeMessageStorage(){
+		body = new ChunkableEventDataSource("body", new SimpleEvent());
+		parts.add(body);
 		
 	}
-	/* (non-Javadoc)
-	 * @see com.hong.dip.smq.Message#getByteBody()
-	 */
-	@Override
-	public byte[] getByteBody() {
-		return byteBody;
-	}
-
-	/* (non-Javadoc)
-	 * @see com.hong.dip.smq.Message#setByteBody(byte[])
-	 */
-	@Override
-	public void setByteBody(byte[] byteBody) {
-		this.byteBody = byteBody;
-	}
-	/* (non-Javadoc)
-	 * @see com.hong.dip.smq.Message#addAttachment(com.hong.dip.smq.ChunkableDataSource)
-	 */
-	@Override
-	public void addAttachment(ChunkableDataSource attachment) throws Exception{
-		if(!attachment.isValid()){
-			throw new IOException("attachment ("+attachment+") is not a valid");
-		}
-		attachments.add(attachment);
-		attachmentNames.add(attachment.getName());
-	}
 	
-	void _addAttachment(ChunkableDataSource attachment){
-		attachments.add(attachment);
-		attachmentNames.add(attachment.getName());
+	public FlumeMessageStorage(Event event) {
+		body = new ChunkableEventDataSource("body", event);
+		parts.add(body);
 	}
-	/* (non-Javadoc)
-	 * @see com.hong.dip.smq.Message#getAttachment(int)
-	 */
-	@Override
-	public ChunkableDataSource getAttachment(int idx){
-		return attachments.get(idx);
+	public Event getEvent(){
+		return body.getEvent();
 	}
-	/* (non-Javadoc)
-	 * @see com.hong.dip.smq.Message#getAttachmentNum()
-	 */
-	@Override
-	public int getAttachmentNum(){
-		return attachments.size();
-	}
-	
-	/* (non-Javadoc)
-	 * @see com.hong.dip.smq.Message#getAttachment(java.lang.String)
-	 */
-	@Override
-	public ChunkableDataSource getAttachment(String name){
-		for(ChunkableDataSource src : attachments){
-			if(name.equals(src.getName())){
-				return src;
-			}
-		}
-		return null;
-	}
-
-	/* (non-Javadoc)
-	 * @see com.hong.dip.smq.Message#getID()
-	 */
 	@Override
 	public String getID() {
-		return msgId;
+		return getEvent().getHeaders().get(HEADER_ID);
 	}
 	@Override
-	public List<String> getAttachmentNameList() {
-		return attachmentNames;
+	public void setID(String msgId) {
+		 getEvent().getHeaders().put(HEADER_ID, msgId);
+	}
+
+
+
+	public String getAttachmentNames(){
+		return getEvent().getHeaders().get(HEADER_ATTACHMENT_NAMELIST);
 	}
 	
-	
-	//Message Storage Functions
+	public void setAttachmentNames(List<String> names){
+		if(names != null){
+			StringBuilder s = new StringBuilder();
+			for(String name : names){
+				s.append(s).append(';');
+			}
+			getEvent().getHeaders().put(HEADER_ATTACHMENT_NAMELIST, s.toString());
+		}
+		
+	}
+	public String getAttachmentPath(){
+		return getEvent().getHeaders().get(HEADER_ATTACHMENT_PATH);
+	}
 	
 	@Override
-	public void updateID(String id) {
-		this.msgId = id;
+	public long getStoreSequence() {
+		return storeSequence;
 	}
+
+	@Override
+	public void setStoreSequence(long sequence) {
+		getEvent().getHeaders().put(HEADER_SEQUENCE, Long.toString(sequence));
+		this.storeSequence = sequence;
+	}
+
+	@Override
+	public <T> T getBodyContent(Class<T> c) {
+		return (T) getEvent();
+	}
+
+	@Override
+	public void loadAttachments() throws Exception{
+		String paths = getEvent().getHeaders().get(HEADER_ATTACHMENT_PATH);
+		String names = getEvent().getHeaders().get(HEADER_ATTACHMENT_NAMELIST);
+		if(paths != null ){
+			List<String> pathlist = StringUtils.string2List(paths);
+			List<String> namelist = StringUtils.string2List(names);
+			
+			int size = Math.min(pathlist.size(), namelist.size()); //TODO : 只是为了防范未知的意外，导致程序崩溃 !!!!不应该出现pathlist, namelist不同的情况
+			for(int i = 0; i < size; i++){
+				ChunkableDataSource ds = new ChunkableFileDataSource(namelist.get(i), new File(pathlist.get(i)));
+				this.addPart(ds);
+				
+			}
+			
+		}
+	}
+	
+	@Override
+	public void addPart(ChunkableDataSource ds) {
+		this.parts.add(null);
+		this.parts.set(this.parts.size() - 2 , ds);
+		this.parts.set(this.parts.size() - 1, ds);
+		
+	}
+
+	@Override
+	public List<ChunkableDataSource> getParts() {
+		return this.parts;
+	}
+
+
 }

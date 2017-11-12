@@ -1,9 +1,16 @@
 package com.hong.dip.smq.transport;
 
-import com.hong.dip.smq.Queue;
+import org.apache.camel.Service;
 
-public interface ServerTransport {
-	public void start() throws Exception;
-	public void stop() throws Exception;
-	public void registerMessageReceiver(Queue queue) throws Exception;
+import com.hong.dip.smq.storage.QueueStorage;
+
+public interface ServerTransport extends Service{
+	/**
+	 * 注册Queue，注册后Transport会接收Queue对应的消息。
+	 * @param queue
+	 * @throws Exception
+	 */
+	public void startMessageReceiver(QueueStorage queue) throws Exception;
+
+	public void stopMessageReceiver(QueueStorage queue);
 }

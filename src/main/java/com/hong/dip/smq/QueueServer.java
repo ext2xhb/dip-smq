@@ -10,6 +10,13 @@ public interface QueueServer {
 	 * @throws Exception
 	 */
 	public Queue createQueue(String qname) throws Exception;
-	public Queue createRemoteQueue(String qname, Node node) throws Exception;
+	public RemoteQueue createRemoteQueue(String qname, Node node) throws Exception;
+	
+	/**
+	 * 删除Queue,暂时不支持。
+	 * @param queue
+	 * @throws Exception
+	 */
+	public void deleteQueue(Queue queue) throws Exception;
 	
 }

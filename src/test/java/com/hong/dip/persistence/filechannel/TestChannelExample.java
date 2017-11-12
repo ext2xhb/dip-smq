@@ -125,7 +125,8 @@ public class TestChannelExample extends TestCase{
 		FlumeOptions options = new FlumeOptions("D:\\temp");
 		options.setTransactionCapacity(3);
 		options.setPutWaitSeconds(3);
-		options.setDefaultQueueDepth(1);
+		options.setDefaultQueueDepth(10);
+		options.setTransactionCapacity(2);
 		FlumeStorage flumeStorage = new FlumeStorage(options);
 		flumeStorage.start();
 		FlumeQueueStorage queueStorage = (FlumeQueueStorage)flumeStorage.getOrCreateQueueStorage("q1");
@@ -135,7 +136,6 @@ public class TestChannelExample extends TestCase{
 		transaction.begin();
 		queueStorage.getChannel().put(new SimpleEvent());
 	
-		
 		transaction.commit();
 		transaction.close();
 		
@@ -154,6 +154,8 @@ public class TestChannelExample extends TestCase{
 		do{
 			Transaction t = channel.getTransaction();
 			t.begin();
+			e = channel.take();
+			e = channel.take();
 			e = channel.take();
 			if(e != null)
 				size++;

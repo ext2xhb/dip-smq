@@ -1,10 +1,14 @@
 package com.hong.dip.utils;
 
+import java.io.ByteArrayOutputStream;
 import java.io.File;
+import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.UnsupportedEncodingException;
 import java.net.MalformedURLException;
 import java.net.URL;
+import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -222,13 +226,6 @@ public final class StringUtils {
         return servletMap;
     }
 
-	public static int parseInt(String header, int defaultV) {
-		try{
-			return Integer.parseInt(header);
-		}catch(NumberFormatException e){
-			return defaultV;
-		}
-	}
 
 	public static String list2String(List<String> list) {
 		StringBuilder b = new StringBuilder();
@@ -238,6 +235,8 @@ public final class StringUtils {
 	}
 	public static List<String> string2List(String s) {
 		List<String> list = new ArrayList<String>();
+		if(s == null)
+			return list;
 		int start = 0;
 		int occurs = -1;
 		
@@ -273,6 +272,117 @@ public final class StringUtils {
 			else
 				throw new IOException("Cannot create directory (" + dir + ")");
 		}
+	}
+
+	public static String map2String(Map<String, Integer> names){
+		StringBuilder builder = new StringBuilder();
+		for(Map.Entry<String, Integer> set : names.entrySet()){
+			builder.append(set.getKey()).append(':').append(set.getValue()).append(';');
+		}
+		return builder.toString();
+	}
+
+//	public static Map<String, Integer> parseMapping(String s) {
+//		Map<String, Integer> names = new HashMap<String, Integer>();
+//		int start = 0;
+//		int occurs = -1;
+//		
+//		while(start < s.length()){
+//			occurs = s.indexOf(';', start);
+//			String part = null;
+//			if(occurs - start >  0){
+//				part = s.substring(start, occurs);
+//				
+//			}else if(occurs == -1){
+//				if(start < s.length()){
+//					part = s.substring(start);
+//				}
+//			}
+//			if(!MsgTransportCmd.splitNameValue(part, names)){
+//				break;
+//			}
+//			//continue next part ';'
+//			start = occurs + 1;
+//			if(occurs < 0)
+//				break;
+//		}
+//		if(names.size() == 0)
+//			return null;
+//		return names;
+//	}
+    public static class ByteBufferInputStream extends InputStream {
+        private final ByteBuffer bb;
+
+        public ByteBufferInputStream(ByteBuffer bb) { 
+        	this.bb = bb; 
+        }
+
+        @Override public int available() { 
+        	return bb.remaining(); 
+        }
+
+        @Override public int read() throws IOException {
+            if (!bb.hasRemaining()) return -1;
+            return bb.get() & 0xFF; // Make sure the value is in [0..255]
+        }
+
+        @Override public int read(byte[] bytes, int off, int len) throws IOException {
+            if (!bb.hasRemaining()) return -1;
+            len = Math.min(len, bb.remaining());
+            bb.get(bytes, off, len);
+            return len;
+        }
+    }
+
+	public static byte[] readInputStreamContent(InputStream is) throws IOException{
+		ByteArrayOutputStream os = new ByteArrayOutputStream();
+		byte[] b = new byte[100];
+		int len;
+		while((len = is.read(b)) != -1){
+			os.write(b, 0, len);
+		}
+		return os.toByteArray();
+	}
+
+	public static void mkEmptyFile(File file) throws IOException{
+		FileOutputStream fos = new FileOutputStream(file);
+		fos.close();
+	}
+
+	public static void writeString(String s, byte[] dest, int offset, int size) {
+		byte[] b = s.getBytes();
+		size = Math.min(size, b.length);
+		System.arraycopy(b, 0, dest, offset, size);
+	}
+
+	public static void writeInt(int v, byte[] b, int offset) {
+		b[offset] = (byte)(((v & 0xFF000000) >> 24) & 0xFF); 
+		b[offset+1] = (byte)(((v & 0xFF0000) >> 16) & 0xFF); 
+		b[offset+2] = (byte)(((v & 0xFF00) >> 8) & 0xFF); 
+		b[offset+3] = (byte)(v & 0xFF); 
+	}
+	public static int readInt(byte[] b, int offset) {
+		return ((b[offset] & 0xFF) << 24) | 
+			((b[offset+1] & 0xFF) << 16) |
+			((b[offset+2] & 0xFF) << 8) |
+			((b[offset+3] & 0xFF));
+	}
+
+	public static String readString(byte[] b, int offset, int size) {
+		int len = 0;
+		for(int i = offset; i < offset+size; i++){
+			if(b[i] == 0)
+				break;
+			len++;
+		}
+		return new String(b, offset, len);
+	}
+
+	public static boolean strEquals(String s1, String s2) {
+		if(s1 == null)
+			return s1 == s2;
+		else
+			return s1.equals(s2);
 	}
 
 }

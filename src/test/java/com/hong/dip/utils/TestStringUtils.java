@@ -28,4 +28,10 @@ public class TestStringUtils extends TestCase{
 		String s2 = StringUtils.list2String(list2);
 		assertEquals(s, s2);
 	}
+	public void testMkEmptyFile() throws Exception{
+		File file = new File("d:\\temp\\empty");
+		file.delete();
+		StringUtils.mkEmptyFile(file);;
+		assertTrue(file.exists());
+	}
 }

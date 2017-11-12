@@ -5,45 +5,49 @@ import org.apache.camel.support.ServiceSupport;
 import com.hong.dip.smq.Node;
 import com.hong.dip.smq.Queue;
 import com.hong.dip.smq.QueueServer;
+import com.hong.dip.smq.RemoteQueue;
+import com.hong.dip.smq.storage.QueueStorage;
+import com.hong.dip.smq.storage.Storage;
 import com.hong.dip.smq.storage.flume.FlumeOptions;
 import com.hong.dip.smq.storage.flume.FlumeStorage;
-import com.hong.dip.smq.transport.http.HttpClientManager;
-import com.hong.dip.smq.transport.http.HttpClientOptions;
-import com.hong.dip.smq.transport.http.JettyOptions;
-import com.hong.dip.smq.transport.http.JettyServer;
+import com.hong.dip.smq.transport.ClientTransport;
+import com.hong.dip.smq.transport.ServerTransport;
+import com.hong.dip.smq.transport.http.client.HttpClientOptions;
+import com.hong.dip.smq.transport.http.client.HttpClientTransport;
+import com.hong.dip.smq.transport.http.server.JettyOptions;
+import com.hong.dip.smq.transport.http.server.JettyTransport;
 
 public class SimpleQueueServer extends ServiceSupport implements QueueServer{
 
 	
-	private FlumeOptions storageOptions;
-	private HttpClientOptions clientOptions;
-	private JettyOptions serverOptions;
-	private FlumeStorage flumeStorage;
-	private HttpClientManager httpClientManager;
-	private JettyServer jettyServer;
 	
-
+	private Storage storage;
+	private ClientTransport clientTransport	;
+	private ServerTransport servertransport;
+	
+	private String nodeName; //当前服务器的名字
 
 	public SimpleQueueServer(FlumeOptions storageOptions, HttpClientOptions clientOptions, JettyOptions serverOptions) {
-		this.storageOptions = storageOptions;
-		this.clientOptions = clientOptions;
-		this.serverOptions = serverOptions;
+		this.storage = new FlumeStorage(storageOptions);
+		this.clientTransport = new HttpClientTransport(clientOptions);
+		if(serverOptions != null){
+			this.servertransport = new JettyTransport(serverOptions);
+		}
+		this.nodeName = clientOptions.getNodeName();
 	}
 
 	public void doStart() throws Exception{
-		this.flumeStorage = new FlumeStorage(this.storageOptions);
-		this.httpClientManager = new HttpClientManager(this.clientOptions);
-		if(serverOptions != null){
-			this.jettyServer = new JettyServer(this.serverOptions);
-		}
-		flumeStorage.start();
-		httpClientManager.start();
-		jettyServer.start();
-		
-		
+		storage.start();
+		clientTransport.start();
+		if(servertransport != null)
+			servertransport.start();
 	}
 	public void doStop() throws Exception{
+		if(servertransport != null)
+			this.servertransport.stop();
+		this.clientTransport.stop();
 		
+		this.storage.stop();
 	}
 	public static class SimpleQueueServerFactory{
 		/**
@@ -59,13 +63,30 @@ public class SimpleQueueServer extends ServiceSupport implements QueueServer{
 	}
 	@Override
 	public Queue createQueue(String qname) throws Exception {
-		// TODO Auto-generated method stub
-		return null;
+		QueueStorage queueStorage = this.storage.getOrCreateQueueStorage(qname);
+		if(this.servertransport != null){
+			servertransport.startMessageReceiver(queueStorage);
+		}
+		return queueStorage.getQueue();
+		
 	}
 
 	@Override
-	public Queue createRemoteQueue(String qname, Node node) throws Exception {
-		// TODO Auto-generated method stub
-		return null;
+	public RemoteQueue createRemoteQueue(String qname, Node node) throws Exception {
+		//发送队列名是本地节点名+队列名
+		QueueStorage queue = this.storage.getOrCreateQueueStorage(nodeName + "_" + qname); 
+		clientTransport.startMessageSender(node, queue);
+		return new RemoteQueue(queue);
+	}
+
+	@Override
+	public void deleteQueue(Queue queue) throws Exception {
+		this.storage.deleteQueueStorage(queue.getName());
+		if(servertransport != null){
+			servertransport.stopMessageReceiver(queue.getStorage());
+		}
+		clientTransport.stopMessageSender(queue.getStorage());
+		
+		
 	}
 }

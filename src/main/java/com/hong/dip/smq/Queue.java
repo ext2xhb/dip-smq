@@ -1,6 +1,9 @@
 package com.hong.dip.smq;
 
+import com.hong.dip.smq.storage.QueueStorage;
+
 public interface Queue {
+	public QueueStorage getStorage();
 	/**
 	 * @param m message to put 
 	 * @return true: success; false: failed as full.
@@ -11,7 +14,7 @@ public interface Queue {
 	 * @return message taked from queue , null : empty 
 	 * @throws Exception unexcepted exception
 	 */
-	public Message getMessage() throws Exception;
+	public Message getMessage(int millis) throws Exception;
 	
 	public void commit() throws Exception;
 	public void rollback() throws Exception;
@@ -19,7 +22,7 @@ public interface Queue {
 	public String getName();
 	
 	/**
-	 * create a empty message ( id is set)
+	 * create a empty message with id
 	 * @return
 	 */
 	public Message createMessage();

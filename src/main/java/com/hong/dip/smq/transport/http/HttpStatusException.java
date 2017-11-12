@@ -4,8 +4,13 @@ public class HttpStatusException extends Exception{
 
 	private int statusCode;
 
-	public HttpStatusException(int statusCode, String description){
-		super(description);
+	public HttpStatusException(int statusCode){
+		super("status error " + statusCode);
+		this.statusCode = statusCode;
+		
+	}
+	public HttpStatusException(int statusCode, String msg){
+		super(msg + "status error " + statusCode);
 		this.statusCode = statusCode;
 		
 	}

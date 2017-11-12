@@ -1,22 +1,19 @@
 package com.hong.dip.smq.transport.http;
 
-import java.util.HashMap;
-import java.util.Map;
-
 import javax.servlet.http.HttpServletRequest;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.hong.dip.smq.Queue;
+import com.hong.dip.smq.storage.QueueStorage;
 import com.hong.dip.utils.StringUtils;
 
 public abstract class MsgTransportCmd {
 	final static Logger log = LoggerFactory.getLogger(MsgTransportCmd.class);
 	public static enum CmdType{
-		MSG_POST, //POST A NEW MESSAGE PART
+		MSG_POST_CHUNK, //POST A NEW MESSAGE PART
 		MSG_POST_CONFIRM, //confirm to message post
-		MSG_CHECK, //CHECK A MESSAGE 
+		MSG_CHECK_MSG, //CHECK A MESSAGE 
 		MSG_CHECK_RESULT,
 
 	}
@@ -31,87 +28,132 @@ public abstract class MsgTransportCmd {
 	}
 	public abstract void writeCmd(HeaderWriter writer);
 	
+	/**
+	 *	发送消息内容的命令，该命令的http request body内容为消息的内容
+	 */
 	public static class MsgPostCmd extends MsgTransportCmd{
-		private String msgId;
+		private String msgId;	//msg id 
 		private int partIndex; // msg part's index. -1: means body, others: 0, 1, 2 means attachments;
-		private int chunkLen;
-		private int chunkIndex; //start from 0;
-		private Map<String, Integer> partNames;
+		private int chunkLen;  //current chunk's length
+		private String attachmentNames; //attachment names of this message;
+		//private String attachmentPaths;
+		private int partNum;
+		private long partLength;
+		private String senderQueue;
 		
-		public MsgPostCmd(String msgId, int partIndex, int chunkLen, int chunkIndex){
-			super(CmdType.MSG_POST);
-			this.msgId = msgId;
-			this.partIndex = partIndex;
-			this.chunkLen = chunkLen;
-			this.chunkIndex = chunkIndex;
+		public String getAttachmentNames() {
+			return attachmentNames;
 		}
+		public void setAttachmentNames(String attachmentNames) {
+			this.attachmentNames = attachmentNames;
+		}
+		/**
+		 * @param msgId: 当前消息的ID
+		 * @param partNum：当前消息一共有多少part
+		 * @param partIndex: 当前发送的chunk所在的part的idx
+		 * @param partLength：当前part的总长度（字节数)
+		 * @param chunkLen： 当前分片的长度
+		 */
+		public MsgPostCmd(String senderQueue, String msgId, int partNum, int partIndex, long partLength, int chunkLen){
+			super(CmdType.MSG_POST_CHUNK);
+			this.senderQueue = senderQueue;
+			this.msgId = msgId;
+			this.partNum = partNum;
+			this.partIndex = partIndex;
+			this.partLength = partLength;
+			this.chunkLen = chunkLen;
+		}
+		public String getSenderQueue() {
+			return this.senderQueue;
+		}		
+		
 		public String getMsgId() {
 			return msgId;
 		}
 
+		public int getPartNum() {
+			return partNum;
+		}
 		public int getPartIndex() {
 			return partIndex;
+		}
+
+		public long getPartLength() {
+			return partLength;
 		}
 
 		public int getChunkLen() {
 			return chunkLen;
 		}
 
-		public int getChunkIndex() {
-			return chunkIndex;
-		}
 		
-		public Map<String, Integer> getPartNames() {
-			return partNames;
-		}
-		public void setPartNames(Map<String, Integer> partNames) {
-			this.partNames = partNames;
-		}
 		@Override
 		public void writeCmd(HeaderWriter writer) {
-			writer.putHeader(HttpConstants.HEADER_ID, this.msgId);
-			writer.putHeader(HttpConstants.HEADER_PART_IDX, Integer.toString(this.partIndex));
-			writer.putHeader(HttpConstants.HEADER_CHUNK_IDX, Integer.toString(this.chunkIndex));
-			writer.putHeader(HttpConstants.HEADER_CHUNK_LENGTH, Integer.toString(this.chunkLen));
-			if(this.partNames != null && this.partNames.size() > 0){
-				writer.putHeader(HttpConstants.HEADER_PART_NAMES, this.map2String(partNames));
-			}
+			writer.putHeader(HttpConstants.HEADER_CMD,  HttpConstants.CMD_SEND_MSG);
 			
+			writer.putHeader(HttpConstants.HEADER_MSG_ID, this.msgId);
+			writer.putHeader(HttpConstants.HEADER_SENDER_QUEUE, this.senderQueue);
+			writer.putIntHeader(HttpConstants.HEADER_PART_NUM, this.partNum);
+			writer.putIntHeader(HttpConstants.HEADER_PART_IDX, this.partIndex);
+			writer.putLongHeader(HttpConstants.HEADER_PART_LENGTH, this.partLength);
+			writer.putIntHeader(HttpConstants.HEADER_CHUNK_LENGTH, this.chunkLen);
+			
+			if(attachmentNames != null){
+				writer.putHeader(HttpConstants.HEADER_ATTACHMENT_NAMES, attachmentNames);
+			}
 		}
-		static private MsgPostCmd parseMsgPostCmd(HeaderReader request) {
-			String msgId = request.getHeader(HttpConstants.HEADER_ID);
+		private static MsgTransportCmd parseMsgPostCmd(HeaderReader request) throws HttpInvalidCmdException{
+			String senderQueue= request.getHeader(HttpConstants.HEADER_SENDER_QUEUE);
+			if(StringUtils.isEmpty(senderQueue)){
+				HttpInvalidCmdException e = new HttpInvalidCmdException("NO SENDER QUEUE", MsgPostCmd.class);
+				log.error(e.toString(), e);
+				throw e;
+			}
+
+			String msgId = request.getHeader(HttpConstants.HEADER_MSG_ID);
 			if(StringUtils.isEmpty(msgId)){
-				log.error("msg post cmd doesnt contains a valid msg id");
-				return null;
+				HttpInvalidCmdException e = new HttpInvalidCmdException("NO Message ID", MsgPostCmd.class);
+				log.error(e.toString(), e);
+				throw e;
 			}
-			int partIndex = StringUtils.parseInt(request.getHeader(HttpConstants.HEADER_PART_IDX),  -2);
+			int partNum = request.getIntHeader(HttpConstants.HEADER_PART_NUM, -1);
+			if(partNum == -1){
+				HttpInvalidCmdException e = new HttpInvalidCmdException("NO PART NUM", MsgPostCmd.class);
+				log.error(e.toString(), e);
+				throw e;
+			}
+			int partIndex =request.getIntHeader(HttpConstants.HEADER_PART_IDX,  -2);
 			if(partIndex == -2){
-				log.error("msg post cmd doesnt contains a valid partIndex" + request.getHeader(HttpConstants.HEADER_PART_IDX));
-				return null;
+				HttpInvalidCmdException e = new HttpInvalidCmdException("NO PART IDX", MsgPostCmd.class);
+				log.error(e.toString(), e);
+				throw e;
 			}
-			int chunkIndex = StringUtils.parseInt(request.getHeader(HttpConstants.HEADER_CHUNK_IDX),  -1);
-			if(chunkIndex == -1){
-				log.error("msg post cmd doesnt contains a valid chunkIndex" + request.getHeader(HttpConstants.HEADER_CHUNK_IDX));
-				return null;
+			long partLen = request.getLongHeader(HttpConstants.HEADER_PART_LENGTH,  -1);
+			if(partLen == -1){
+				HttpInvalidCmdException e = new HttpInvalidCmdException("NO PART LENGTH", MsgPostCmd.class);
+				log.error(e.toString(), e);
+				throw e;
 			}
-			int chunkLen = StringUtils.parseInt(request.getHeader(HttpConstants.HEADER_CHUNK_LENGTH),  -1);
-			if(chunkIndex == -1){
-				log.error("msg post cmd doesnt contains a valid chunk length" + request.getHeader(HttpConstants.HEADER_CHUNK_LENGTH));
-				return null;
+
+			int chunkLen = request.getIntHeader(HttpConstants.HEADER_CHUNK_LENGTH,  -1);
+			if(chunkLen == -1){
+				HttpInvalidCmdException e = new HttpInvalidCmdException("NO CHUNK LENGTH", MsgPostCmd.class);
+				log.error(e.toString(), e);
+				throw e;
 			}
-			MsgPostCmd cmd = new MsgTransportCmd.MsgPostCmd(msgId, partIndex, chunkLen, chunkIndex);
-			if(!StringUtils.isEmpty(request.getHeader(HttpConstants.HEADER_PART_NAMES))){
-				Map<String, Integer> partNames = parseMapping(request.getHeader(HttpConstants.HEADER_PART_NAMES));
-				cmd.setPartNames(partNames);
+			MsgPostCmd cmd = new MsgTransportCmd.MsgPostCmd(senderQueue, msgId, partNum, partIndex, partLen, chunkLen);
+			String attachmentNames = request.getHeader(HttpConstants.HEADER_ATTACHMENT_NAMES);
+			if(attachmentNames != null ){
+				cmd.setAttachmentNames(attachmentNames);
 			}
 			return cmd;
 			
-		}		
+		}
 	}
-	public static class MsgPostConfirm extends MsgTransportCmd{
+	public static class MsgSuccessConfirm extends MsgTransportCmd{
 
 		private HttpStatusException e;
-		public MsgPostConfirm(){
+		public MsgSuccessConfirm(){
 			super(CmdType.MSG_POST_CONFIRM);
 		}
 		
@@ -131,25 +173,32 @@ public abstract class MsgTransportCmd {
 
 		@Override
 		public void writeCmd(HeaderWriter writer) {
+			
 		}
 		
 	}
 	
 	public static class MsgCheckCmd extends MsgTransportCmd{
 		private String msgId;
-
 		private int partNum;
 		private int chunkSize;
+		private String senderQueueName;
 		/**
+		 * @param senderQueueName: 发送队列名
 		 * @param msgId
-		 * @param partNum: 消息的part的总个数（最少为1）
+		 * @param partNum: 消息的part的总个数（由于Body也是一个Part，所以个数最少为1）
 		 * @param chunkSize：一个分片的大小。
 		 */
-		public MsgCheckCmd(String msgId, int partNum, int chunkSize){
-			super(CmdType.MSG_CHECK);
+		public MsgCheckCmd(String senderQueueName, String msgId, int partNum, int chunkSize){
+			super(CmdType.MSG_CHECK_MSG);
 			this.msgId = msgId;
 			this.partNum = partNum;
 			this.chunkSize = chunkSize;
+			this.senderQueueName = senderQueueName;
+		}
+		
+		public String getSenderQueueName(){
+			return this.senderQueueName;
 		}
 		public String getMsgId() {
 			return msgId;
@@ -164,72 +213,93 @@ public abstract class MsgTransportCmd {
 		}
 		@Override
 		public void writeCmd(HeaderWriter writer) {
-			writer.putHeader(HttpConstants.HEADER_ID, msgId);
+			writer.putHeader(HttpConstants.HEADER_CMD, HttpConstants.CMD_CHECK_MSG);
+			writer.putHeader(HttpConstants.HEADER_MSG_ID, msgId);
 			writer.putHeader(HttpConstants.HEADER_PART_NUM, Integer.toString(partNum));
 			writer.putHeader(HttpConstants.HEADER_CHUNK_SIZE, Integer.toString(chunkSize));
 		}
 		
-		static private MsgCheckCmd parseMsgCheckCmd(HeaderReader request) {
-
-			String msgId = request.getHeader(HttpConstants.HEADER_ID);
+		static private MsgCheckCmd parseMsgCheckCmd(HeaderReader request) throws HttpInvalidCmdException {
+			String senderQName = request.getHeader(HttpConstants.HEADER_QNAME);
+			if(StringUtils.isEmpty(senderQName)){
+				HttpInvalidCmdException e = new HttpInvalidCmdException("No QName", MsgCheckCmd.class);
+				log.error(e.toString(), e);
+				throw e;
+			}
+			String msgId = request.getHeader(HttpConstants.HEADER_MSG_ID);
 			if(StringUtils.isEmpty(msgId)){
-				log.error("msg check cmd doesnt contains a valid msg id");
-				return null;
+				HttpInvalidCmdException e = new HttpInvalidCmdException("NO Message ID", MsgCheckCmd.class);
+				log.error(e.toString(), e);
+				throw e;
 			}
-			int partNum = StringUtils.parseInt(request.getHeader(HttpConstants.HEADER_PART_NUM),  -1);
+			int partNum = request.getIntHeader(HttpConstants.HEADER_PART_NUM,  -1);
 			if(partNum < 0){
-				log.error("msg check cmd doesn't contains a valid partnum=" +  request.getHeader(HttpConstants.HEADER_PART_NUM));
-				return null;
+				HttpInvalidCmdException e = new HttpInvalidCmdException("NO Part Num", MsgCheckCmd.class);
+				log.error(e.toString(), e);
+				throw e;
 			}
-			int chunkSize = StringUtils.parseInt(request.getHeader(HttpConstants.HEADER_CHUNK_SIZE), -1);
+			int chunkSize = request.getIntHeader(HttpConstants.HEADER_CHUNK_SIZE, -1);
 			if(chunkSize < 0){
-				log.error("msg check cmd doesn't contains a valid chunksize=" +  request.getHeader(HttpConstants.HEADER_CHUNK_SIZE));
-				return null;
+				HttpInvalidCmdException e = new HttpInvalidCmdException("NO CHUNK SIZE", MsgCheckCmd.class);
+				log.error(e.toString(), e);
+				throw e;
 			}
-			return new MsgTransportCmd.MsgCheckCmd(msgId, partNum, chunkSize);
+			
+			return new MsgTransportCmd.MsgCheckCmd(senderQName, msgId, partNum, chunkSize);
 		}
 	}
 	
 	public static class MsgCheckResult extends MsgTransportCmd{
-		private String msgId;
 		private int partIdx;
-		private int chunkIdx;
+		private long chunkIdx;
 
 		/**
 		 * @param msgId: 消息id
-		 * @param partIdx： 当前保存完整或者部分完整的消息Part序号。（小于该序号的Part一定要确保保存完整）
-		 * @param chunkIndex：保存完整。无数据错误的seq序号；-1表示整个消息全部完整。
+		 * @param partIdx： 当前保存完整或者部分完整的消息Part序号。小于该序号的Part的内容是完整的，所以只需要从当前partIndex开始保存即可。
+		 * @param chunkIndex：>=0表示需要从当前chunkIndex重新写；-1表示整个消息全部完整，无需继续写
 		 */
-		public MsgCheckResult(String msgId, int partIdx, int chunkIdx){
-			super(CmdType.MSG_CHECK);
-			this.msgId = msgId;
+		public MsgCheckResult(int partIdx, long chunkIdx){
+			super(CmdType.MSG_CHECK_MSG);
 			this.partIdx = partIdx;
 			this.chunkIdx = chunkIdx;
-		}
-
-		public String getMsgId() {
-			return msgId;
 		}
 
 		public int getPartIdx() {
 			return partIdx;
 		}
 
-		public int getChunkIdx() {
+		public long getChunkIdx() {
 			return chunkIdx;
 		}
 
 		@Override
 		public void writeCmd(HeaderWriter writer) {
-			writer.putHeader(HttpConstants.HEADER_ID, msgId);
+			writer.putHeader(HttpConstants.HEADER_CMD, HttpConstants.CMD_CHECK_MSG_RESULT);
+			
 			writer.putHeader(HttpConstants.HEADER_PART_IDX, Integer.toString(partIdx));
-			writer.putHeader(HttpConstants.HEADER_CHUNK_IDX, Integer.toString(chunkIdx));
+			writer.putHeader(HttpConstants.HEADER_CHUNK_IDX, Long.toString(chunkIdx));
 		
+		}
+
+		static MsgTransportCmd parseMsgCheckResult(HeaderReader reader) throws HttpInvalidCmdException {
+			int partIdx = reader.getIntHeader(HttpConstants.HEADER_PART_IDX, -2);
+			if(partIdx == -2){
+				HttpInvalidCmdException e = new HttpInvalidCmdException("NO PART IDX", MsgCheckResult.class);
+				log.error(e.toString(), e);
+				throw e;
+			}
+			long chunkIdx = reader.getLongHeader(HttpConstants.HEADER_CHUNK_IDX, -1);
+			if(chunkIdx == -1){
+				HttpInvalidCmdException e = new HttpInvalidCmdException("NO CHUNK IDX", MsgCheckResult.class);
+				log.error(e.toString(), e);
+				throw e;
+			}
+			return new MsgCheckResult(partIdx, chunkIdx); 
 		}
 		
 	}
 
-	public static MsgTransportCmd buildCmdForQueue(HttpServletRequest request, Queue queue) {
+	public static MsgTransportCmd parseCmd(HttpServletRequest request, QueueStorage queue) throws HttpInvalidCmdException {
 		String path = request.getContextPath();
 		if(path.length() > 0 && path.charAt(path.length() - 1) == '/'){
 			path = path.substring(0, path.length() - 1);
@@ -238,9 +308,10 @@ public abstract class MsgTransportCmd {
 		if(queue.getName().equals(qname)){
 			return parseCmd(request);
 		}
-		return null;
+		else
+			throw new HttpInvalidCmdException("Received a request, But NO Matched Queue request is" + path, null);
 	}
-	private static MsgTransportCmd parseCmd(HttpServletRequest request) {
+	private static MsgTransportCmd parseCmd(HttpServletRequest request) throws HttpInvalidCmdException {
 		HeaderReader reader = new HeaderReader(){
 
 			@Override
@@ -252,52 +323,50 @@ public abstract class MsgTransportCmd {
 	}
 	
 
-	public static MsgTransportCmd parseCmd(HeaderReader reader) {
+	public static MsgTransportCmd parseCmd(HeaderReader reader) throws HttpInvalidCmdException{
 		String cmd = reader.getHeader(HttpConstants.HEADER_CMD);
-		if(HttpConstants.CMD_POST_MSG.equals(cmd)){
+		if(HttpConstants.CMD_SEND_MSG.equals(cmd)){
 			return MsgPostCmd.parseMsgPostCmd(reader);
 		}else if(HttpConstants.CMD_CHECK_MSG.equals(cmd)){
 			return MsgCheckCmd.parseMsgCheckCmd(reader);
-		}
-		return null;	
-	}
-
-	public static String map2String(Map<String, Integer> names){
-		StringBuilder builder = new StringBuilder();
-		for(Map.Entry<String, Integer> set : names.entrySet()){
-			builder.append(set.getKey()).append(':').append(set.getValue()).append(';');
-		}
-		return builder.toString();
-	}
-	public static Map<String, Integer> parseMapping(String s) {
-		Map<String, Integer> names = new HashMap<String, Integer>();
-		int start = 0;
-		int occurs = -1;
+		}else if(HttpConstants.CMD_CHECK_MSG_RESULT.equals(cmd)){
+			return MsgCheckResult.parseMsgCheckResult(reader);
+		}else if(cmd == null)
+			return new MsgTransportCmd.MsgSuccessConfirm();
+		else
+			throw new HttpInvalidCmdException("UNKNOWN CMD " + cmd, null);
 		
-		while(start < s.length()){
-			occurs = s.indexOf(';', start);
-			String part = null;
-			if(occurs - start >  0){
-				part = s.substring(start, occurs);
-				
-			}else if(occurs == -1){
-				if(start < s.length()){
-					part = s.substring(start);
-				}
-			}
-			if(!splitNameValue(part, names)){
-				break;
-			}
-			//continue next part ';'
-			start = occurs + 1;
-			if(occurs < 0)
-				break;
-		}
-		if(names.size() == 0)
-			return null;
-		return names;
 	}
-	private static boolean splitNameValue(String part, Map<String, Integer> names) {
+	public static abstract class HeaderReader{
+		public abstract String getHeader(String name);
+		
+		public long getLongHeader(String name, int defaultValue) {
+			try{
+				return Long.parseLong(getHeader(name));
+			}catch(NumberFormatException e){
+				return defaultValue;
+			}
+		}
+		
+		public int getIntHeader(String name, int defaultValue){
+			try{
+				return Integer.parseInt(getHeader(name));
+			}catch(NumberFormatException e){
+				return defaultValue;
+			}
+		}
+	}
+	public static abstract class  HeaderWriter {
+		public abstract void putHeader(String name, String value);
+		public void putIntHeader(String name, int value){
+			putHeader(name, Integer.toString(value));
+		}
+		public void putLongHeader(String name, long value){
+			putHeader(name, Long.toString(value));
+		}
+	}
+	/*
+	public static boolean splitNameValue(String part, Map<String, Integer> names) {
 		if(part == null)
 			return false;
 		String name, value;
@@ -316,11 +385,6 @@ public abstract class MsgTransportCmd {
 		}
 		return false;
 	}
-	public static interface HeaderReader{
-		String getHeader(String header);
-		
-	}
-	public static interface HeaderWriter{
-		void putHeader(String header, String value);
-	}
+	*/
+
 }
