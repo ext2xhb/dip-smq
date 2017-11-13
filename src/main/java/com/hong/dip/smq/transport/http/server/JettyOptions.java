@@ -7,7 +7,7 @@ public class JettyOptions {
 	private String host = "0.0.0.0";
 	private int port = 8080;
 	private boolean isReuseAddress = false;
-	private long maxIdleTime = 60000; //mili-seconds for max idle time, 0 is invalide as it means never-time-out
+	private long maxIdleTime = 3600000; //mili-seconds for max idle time, 0 is invalide as it means never-time-out
 	
 	public boolean isReuseAddress() {
 		return isReuseAddress;

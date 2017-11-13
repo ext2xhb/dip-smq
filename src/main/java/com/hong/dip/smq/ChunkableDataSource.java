@@ -57,5 +57,9 @@ public interface ChunkableDataSource extends DataSource{
 		 * @return
 		 */
 		public long getSize() throws IOException;
+		/**
+		 * @return	上次读取的chunk在存储中的偏移量。
+		 */
+		public long getReadedChunkOffset();
 	}
 }

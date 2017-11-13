@@ -28,6 +28,7 @@ public class FlumeStorage extends ServiceSupport implements Storage{
 	
 	public FlumeStorage(FlumeOptions options){
 		this.options = options;
+		this.attachmentDir = new File(options.getStoragePath(), ATTACHMENT_DIR);
 	}
 	private Context createContext(FlumeOptions options) {
 		Context context = new Context();
@@ -52,11 +53,11 @@ public class FlumeStorage extends ServiceSupport implements Storage{
 	private File getDataDir(FlumeOptions options) {
 		return new File(options.getStoragePath(), DATA_DIR);
 	}
-	private File getAttachmentDir(FlumeOptions options) {
+	private File getAttachmentDir() {
 		if(this.attachmentDir == null){
 			this.attachmentDir = new File(options.getStoragePath(), ATTACHMENT_DIR);
 		}
-			return this.attachmentDir;
+		return this.attachmentDir;
 	}
 	
 	private void prepareStorageBase(FlumeOptions options)  throws Exception{
@@ -69,7 +70,8 @@ public class FlumeStorage extends ServiceSupport implements Storage{
 
 		dir = (this.getDataDir(options));
 		StringUtils.ensureDirExists(dir);
-		dir = this.getAttachmentDir(options);
+		dir = this.getAttachmentDir();
+		StringUtils.ensureDirExists(dir);
 
 	}
 	
@@ -91,7 +93,7 @@ public class FlumeStorage extends ServiceSupport implements Storage{
 	}
 	
 	private File getQueueAttachmentDir(String qname) {
-		return new File(this.getAttachmentDir(options), qname);
+		return new File(this.getAttachmentDir(), qname);
 	}
 	@Override
 	protected void doStop() throws Exception {

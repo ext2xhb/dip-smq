@@ -1,5 +1,8 @@
 package com.hong.dip.smq;
 
+import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -44,14 +47,14 @@ public class SimpleMessage implements Message {
 	/* (non-Javadoc)
 	 * @see com.hong.dip.smq.Message#addAttachment(com.hong.dip.smq.ChunkableDataSource)
 	 */
-	public boolean addAttachment(ChunkableDataSource attachment){
+	public void addAttachment(ChunkableDataSource attachment) throws IOException{
 		if(!attachment.isValid()){
 			log.error("attachment ("+attachment+") is not a valid");
-			return false;
+			throw new FileNotFoundException("attachment ("+attachment+") is not a valid"); 
 		}
 		attachments.add(attachment);
 		attachmentNames.add(attachment.getName());
-		return true;
+		return;
 	}
 	
 	/* (non-Javadoc)
@@ -78,6 +81,10 @@ public class SimpleMessage implements Message {
 	 */
 	public List<ChunkableDataSource> getAttachments(){
 		return this.attachments;
+	}
+	@Override
+	public void addAttachment(String name, File attachment) throws IOException{
+		this.addAttachment(new ChunkableFileDataSource(name, attachment));
 	}
 	
 	//Message Storage Functions

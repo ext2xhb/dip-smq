@@ -7,9 +7,18 @@ import com.hong.dip.smq.storage.QueueStorage;
 public class RemoteQueue implements Queue {
 	
 	private QueueStorage storage;
-
-	public RemoteQueue(QueueStorage storage){
+	private String destQueue;
+	private Node destNode;
+	public RemoteQueue(Node destNode, String destQueue, QueueStorage storage){
 		this.storage = storage;
+		this.destNode = destNode;
+		this.destQueue = destQueue;
+	}
+	public String getDestQueueName(){
+		return destQueue;
+	}
+	public Node getDestNode(){
+		return this.destNode;
 	}
 	@Override
 	public QueueStorage getStorage() {

@@ -1,6 +1,8 @@
 package com.hong.dip.smq.server;
 
 import org.apache.camel.support.ServiceSupport;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.hong.dip.smq.Node;
 import com.hong.dip.smq.Queue;
@@ -18,7 +20,7 @@ import com.hong.dip.smq.transport.http.server.JettyOptions;
 import com.hong.dip.smq.transport.http.server.JettyTransport;
 
 public class SimpleQueueServer extends ServiceSupport implements QueueServer{
-
+	static final Logger log = LoggerFactory.getLogger(SimpleQueueServer.class);
 	
 	
 	private Storage storage;
@@ -73,10 +75,17 @@ public class SimpleQueueServer extends ServiceSupport implements QueueServer{
 
 	@Override
 	public RemoteQueue createRemoteQueue(String qname, Node node) throws Exception {
+		try{
 		//发送队列名是本地节点名+队列名
-		QueueStorage queue = this.storage.getOrCreateQueueStorage(nodeName + "_" + qname); 
-		clientTransport.startMessageSender(node, queue);
-		return new RemoteQueue(queue);
+		QueueStorage queue = this.storage.getOrCreateQueueStorage(
+				nodeName + "_" + qname);
+		RemoteQueue rQueue = new RemoteQueue(node, qname, queue);
+		clientTransport.startMessageSender(rQueue, queue);
+		return rQueue;
+		}catch(Exception e){
+			log.error("Cannot create remote queue("+qname + " " +node+")", e);
+			throw e;
+		}
 	}
 
 	@Override

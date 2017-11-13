@@ -19,6 +19,7 @@ public interface HttpConstants {
 	public static final String HEADER_PART_NUM = "PARTNUM"; //消息part的数量（每个Attachment是一个part, body也被当作一个特殊的part)
 	public static final String HEADER_PART_IDX = "PARTIDX"; //part's index: -1:body, 0,1，2..: attachements parts;
 	public static final String HEADER_PART_LENGTH = "PARTLEN"; //当前 chunk的长度（字节数）
+	public static final String HEADER_CHUNK_OFFSET = "CHUNKPTR"; //当前chunk在存储中的偏移量
 	public static final String HEADER_CHUNK_LENGTH = "CHUNKLEN"; //当前 chunk的长度（字节数）
 	public static final String HEADER_CHUNK_IDX = "CHUNKIDX"; //message part的一个分片的序号: 0, 1,2,3 , 最后一个分片的序号为负数
 	public static final String HEADER_CHUNK_SIZE = "CHUNKSIZE"; //chunk 分片的大小（一般是一个配置的固定值）;
@@ -28,7 +29,6 @@ public interface HttpConstants {
 	public static final Charset CHARSET_UTF8 = Charset.forName("UTF-8");
 	//public static final String METHOD_POST = "POST";
 	public static final String HEADER_QNAME = "q_qname";
-	public static final String HEADER_CONTENT_LENGTH = "Content-Length";
 	
 	
 }

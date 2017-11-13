@@ -63,6 +63,14 @@ public class HttpClientManager extends ServiceSupport{
         connManager.setDefaultMaxPerRoute(options.getMaxConnPerClient());
         
 	}
+
+	@Override
+	protected void doStart() throws Exception {
+	}
+
+	@Override
+	protected void doStop() throws Exception {
+	}
 	
 	private RequestConfig createDefaultRequestConfig(){
 		return RequestConfig.custom()
@@ -86,6 +94,9 @@ public class HttpClientManager extends ServiceSupport{
 
 		public HttpClient(CloseableHttpClient backClient, String url){
 			this.backClient = backClient;
+			//url must end with '/'
+			if(url.charAt(url.length() - 1) != '/')
+				url = url + "/";
 			this.url = url;
 		}
 		
@@ -150,15 +161,13 @@ public class HttpClientManager extends ServiceSupport{
 		}
 
 		private void setPostInput(InputStream input, int contentLength, HttpPost post) {
-			post.setHeader(HttpConstants.HEADER_CONTENT_LENGTH, 
-					Integer.toString(input == null ? 0 : contentLength));
 			if(input == null)
 				input = new ByteArrayInputStream(zeroBytes);
-			if(input != null){
-				HttpEntity entity = new InputStreamEntity(input);
-				post.setEntity(entity);
-				
-			}
+			
+			HttpEntity entity = new InputStreamEntity(input, contentLength);
+			post.setEntity(entity);
+			
+			
 		}
 
 		private void setCmd2Post(MsgTransportCmd cmd, final HttpPost post) {
@@ -217,18 +226,11 @@ public class HttpClientManager extends ServiceSupport{
 		}
 
 		public MsgTransportCmd executeCmd(MsgTransportCmd cmd, ByteBuffer buffer) throws HttpStatusException, HttpNetException {
-			return this.postMethod(cmd, new StringUtils.ByteBufferInputStream(buffer), buffer.remaining());
+			return this.postMethod(cmd, 
+				buffer == null ? null :new StringUtils.ByteBufferInputStream(buffer), 
+				buffer == null ? 0 : buffer.remaining());
 			
 		}
-	}
-	@Override
-	protected void doStart() throws Exception {
-	}
-
-	@Override
-	protected void doStop() throws Exception {
-		//TODO release all clients safely
-		
 	}
 	
 

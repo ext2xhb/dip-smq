@@ -18,11 +18,6 @@ public interface MessageStorage {
 	 */
 	<T> T getBodyContent(Class<T> c);
 	
-	/**
-	 * 加载存储中的附件内容
-	 */
-	void loadAttachments() throws Exception;
-	
 	void addPart(ChunkableDataSource ds);
 	List<ChunkableDataSource> getParts();
 }

@@ -16,6 +16,7 @@ import java.util.regex.Pattern;
 import junit.framework.TestCase;
 
 public class TestStringUtils extends TestCase{
+	
 	public void testList2String(){
 		List<String> list = Arrays.asList("a", "b", "c");
 		String s = StringUtils.list2String(list);
@@ -29,7 +30,7 @@ public class TestStringUtils extends TestCase{
 		assertEquals(s, s2);
 	}
 	public void testMkEmptyFile() throws Exception{
-		File file = new File("d:\\temp\\empty");
+		File file = new File(".\\snode_flume\\attachment\\__check_log_");
 		file.delete();
 		StringUtils.mkEmptyFile(file);;
 		assertTrue(file.exists());

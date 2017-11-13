@@ -7,10 +7,27 @@ import java.util.List;
 import com.hong.dip.smq.transport.MessageCtrlException.FatalMessageException;
 import com.hong.dip.smq.transport.MessageCtrlException.TemporaryMessageException;
 
+/**
+ * @author xuhb
+ *
+ */
 public interface MessageWriter {
 	String getMessageId();
 
-	void writeMeta(String msgId, List<String> string2List, int partNum);
+	/**
+	 * 检查当前Writer是否正在写入此消息
+	 * @param msgId
+	 * @return
+	 */
+	boolean isWritingMsg(String msgId);
+	/**
+	 * 开始写入新的消息
+	 * @param msgId
+	 * @param string2List
+	 * @param partNum
+	 * @throws IOException
+	 */
+	void startNewMessage(String msgId, List<String> string2List, int partNum) throws IOException;
 
 
 	/**
@@ -22,14 +39,16 @@ public interface MessageWriter {
 	 * @throws TemporaryMessageException
 	 * @throws FatalMessageException
 	 */
-	void writeChunk(int partIndex, long partLength, int chunkLen, InputStream inputStream) throws TemporaryMessageException, FatalMessageException;
+	void writeChunk(int partIndex, long partLength, long chunkIndex, int chunkLen, InputStream inputStream) throws TemporaryMessageException, FatalMessageException;
 
 	/**
-	 * 检查消息内容的完整性，返回的消息位置表示，从该位置补全后内容才完整。
-	 * 当partPos超过消息的最大的partIndex时，消息已经完整。
-	 * @return
+	 * 检查消息内容的完整性，并返回需要继续写入的位置
+	 * msgId 要检查的消息的id
+	 * partNum	要检查的消息所拥有的part总数。
+	 * @return MessagePosition partInde表示需要从该part继续写入消息内容，chunkIndex表示从part的chunkIndex处继续写入消息内容。chunkIndex=-1表示当前part的内容是完整的。是否需要继续写入由发送方判断
+	 * 目前的实现方式下，chunkIndex=-1表示当前消息的内容完整，无需写入。
 	 */
-	MessagePosition checkAndSetWritePosition() throws IOException;
+	MessagePosition checkPositionToWrite(String msgId, int partNum) throws IOException;
 	
 	void open() throws IOException;
 	void close();
@@ -52,6 +71,9 @@ public interface MessageWriter {
 		
 	}
 
+
+
+	
 
 
 

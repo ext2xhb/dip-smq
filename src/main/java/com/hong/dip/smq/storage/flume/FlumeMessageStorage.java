@@ -7,6 +7,8 @@ import java.util.Map;
 
 import org.apache.flume.Event;
 import org.apache.flume.event.SimpleEvent;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.hong.dip.smq.ChunkableDataSource;
 import com.hong.dip.smq.ChunkableFileDataSource;
@@ -16,9 +18,10 @@ import com.hong.dip.smq.storage.MessageStorage;
 import com.hong.dip.utils.StringUtils;
 
 public class FlumeMessageStorage implements MessageStorage {
+	final static Logger log = LoggerFactory.getLogger(FlumeMessageStorage.class);
 	private static final String HEADER_ID = "id";
 	private static final String HEADER_ATTACHMENT_NAMELIST = "names";
-	private static final String HEADER_ATTACHMENT_PATH = "url";
+	private static final String HEADER_ATTACHMENT_PATH = "paths";
 	private static final String HEADER_SEQUENCE = "seq";
 	
 	static MessageStorage cast2Storage(Message m){
@@ -51,8 +54,13 @@ public class FlumeMessageStorage implements MessageStorage {
 		m.setByteBody(((FlumeMessageStorage)storage).getEvent().getBody());
 		
 		List<ChunkableDataSource> parts = storage.getParts();
-		for(int i = 1; i < parts.size(); i++)
-			m.addAttachment(parts.get(i));
+		for(int i = 0; i < parts.size() - 1; i++)
+			try{
+				m.addAttachment(parts.get(i));
+			}catch(Exception e){
+				//impossible
+				log.error("attachment("+parts.get(i)+") of storage is not valid", e);
+			}
 		return m;
 	}
 
@@ -70,6 +78,7 @@ public class FlumeMessageStorage implements MessageStorage {
 	public FlumeMessageStorage(Event event) {
 		body = new ChunkableEventDataSource("body", event);
 		parts.add(body);
+		this.makeAttachments();
 	}
 	public Event getEvent(){
 		return body.getEvent();
@@ -90,18 +99,29 @@ public class FlumeMessageStorage implements MessageStorage {
 	}
 	
 	public void setAttachmentNames(List<String> names){
-		if(names != null){
+		if(names != null  && names.size() > 0){
 			StringBuilder s = new StringBuilder();
 			for(String name : names){
-				s.append(s).append(';');
+				s.append(name).append(';');
 			}
 			getEvent().getHeaders().put(HEADER_ATTACHMENT_NAMELIST, s.toString());
 		}
 		
 	}
-	public String getAttachmentPath(){
-		return getEvent().getHeaders().get(HEADER_ATTACHMENT_PATH);
+	public void setAttachmentPaths(List<String> paths) {
+		if(paths != null  && paths.size() > 0){
+			StringBuilder s = new StringBuilder();
+			for(String path : paths){
+				s.append(path).append(';');
+			}
+			getEvent().getHeaders().put(HEADER_ATTACHMENT_PATH, s.toString());
+		}
+		
 	}
+//
+//	public String getAttachmentPath(){
+//		return getEvent().getHeaders().get(HEADER_ATTACHMENT_PATH);
+//	}
 	
 	@Override
 	public long getStoreSequence() {
@@ -119,8 +139,7 @@ public class FlumeMessageStorage implements MessageStorage {
 		return (T) getEvent();
 	}
 
-	@Override
-	public void loadAttachments() throws Exception{
+	private void makeAttachments(){
 		String paths = getEvent().getHeaders().get(HEADER_ATTACHMENT_PATH);
 		String names = getEvent().getHeaders().get(HEADER_ATTACHMENT_NAMELIST);
 		if(paths != null ){
@@ -131,7 +150,6 @@ public class FlumeMessageStorage implements MessageStorage {
 			for(int i = 0; i < size; i++){
 				ChunkableDataSource ds = new ChunkableFileDataSource(namelist.get(i), new File(pathlist.get(i)));
 				this.addPart(ds);
-				
 			}
 			
 		}
@@ -141,7 +159,7 @@ public class FlumeMessageStorage implements MessageStorage {
 	public void addPart(ChunkableDataSource ds) {
 		this.parts.add(null);
 		this.parts.set(this.parts.size() - 2 , ds);
-		this.parts.set(this.parts.size() - 1, ds);
+		this.parts.set(this.parts.size() - 1, this.body);
 		
 	}
 
@@ -149,6 +167,7 @@ public class FlumeMessageStorage implements MessageStorage {
 	public List<ChunkableDataSource> getParts() {
 		return this.parts;
 	}
+
 
 
 }

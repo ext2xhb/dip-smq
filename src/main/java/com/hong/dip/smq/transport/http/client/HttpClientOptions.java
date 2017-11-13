@@ -9,7 +9,7 @@ public class HttpClientOptions {
 	private int soTimeOut = 3000; 
 	private boolean soKeepAlive = true;
 	private int connectionTimeout = 5000; //socket connection 连接超时
-	private int socketTimeout = 5000;				//socket timeout
+	private int socketTimeout = 5000;	//socket timeout: RequestConfig.getSocketTimeout())
 	private int connectionRequestTimeout = 5000; //http request timeout
 	private int maxConnection = 200; //连接池上限（由于我们是长连接，所以这个数值并不关键）
 	private int maxConnPerClient = 50; //HttpClient的实现需要约束每个Client的连接数上限，需要注意这个数值应该大于我们的Client节点上的队列数。

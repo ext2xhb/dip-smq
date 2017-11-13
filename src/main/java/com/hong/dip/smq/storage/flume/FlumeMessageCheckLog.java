@@ -21,7 +21,7 @@ public class FlumeMessageCheckLog {
 	static final int MSGIDSIZE = 50;
 	static final int INTSIZE = 4;
 	static final int MSGDESCSIZE = MSGIDSIZE + INTSIZE * 2; 
-	static final int CHECKPOINTSIZE = QNAMESIZE + MSGDESCSIZE;  
+	static final int CHECKPOINTSIZE = QNAMESIZE + MSGDESCSIZE * 2;  
 	
 	File checkLogFile;
 	RandomAccessFile fileAccess;
@@ -61,8 +61,9 @@ public class FlumeMessageCheckLog {
 	}
 
 	public void open() throws IOException{
-		if(!checkLogFile.exists())
+		if(!checkLogFile.exists()){
 			StringUtils.mkEmptyFile(checkLogFile);
+		}
 		fileAccess = new RandomAccessFile(checkLogFile, "rws");
 		loadCheckPoint();
 		

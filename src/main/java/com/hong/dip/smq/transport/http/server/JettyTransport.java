@@ -48,7 +48,8 @@ public class JettyTransport implements ServerTransport {
 	@Override
 	public void startMessageReceiver(QueueStorage queue) throws Exception {
 		try{
-			server.addServant("/queue/" + queue.getName(), new JettyHandler(queue));
+			server.addServant(
+					"/queue/" + queue.getName(), new JettyHandler(queue));
 		}catch(Exception e){
 			log.error("cannot add url handler for queue " + queue.getName(), e);
 			throw e;
@@ -76,8 +77,8 @@ public class JettyTransport implements ServerTransport {
 				try {
 					cmd = MsgTransportCmd.parseCmd(request, storage);
 				} catch (HttpInvalidCmdException e) {
-					String err = "Cannot parse command for queue("+storage.getName()+") request("+request.getContextPath()+")";
-					log.error(err);
+					String err = "Invalide command ; queue("+storage.getName()+") request("+request.getContextPath()+")";
+					log.error(err, e);
 					sendErrorResponse(response, HttpConstants.STATUS_UNAVAILABLE,err);
 					return;
 					
@@ -145,20 +146,11 @@ public class JettyTransport implements ServerTransport {
 		private MsgCheckResult executeMsgCheck(MsgCheckCmd cmd, QueueStorage queue) 
 				throws TemporaryMessageException, FatalMessageException{
 			//queue.checkMessage(cmd.getSenderQueueName(), cmd.getMsgId(), cmd.getPartNum(), cmd.getChunkSize());
-			MessageWriter writer = queue.getCurrentMessageWriter(cmd.getSenderQueueName());
-			if(writer == null)
-				try{
-					writer = queue.getOrOpenMessageWriter(cmd.getSenderQueueName(), cmd.getMsgId());
-					MessagePosition position = writer.checkAndSetWritePosition();
-					return new MsgCheckResult(position.getPartIndex(), position.getChunkIndex());
-				}catch(IOException e){
-					TemporaryMessageException e1 = new TemporaryMessageException("Temporary Error Occurs; save message to queue("+queue.getName()+")", e); //TODO: ??现在简单处理，让客户端重试；正确做法应该是让客户端死信；
-					log.error(e1.getMessage(), e);
-					throw e1;
-				}
+			MessageWriter writer;// = queue.getCurrentMessageWriter(cmd.getSenderQueueName());
 			try{
-				MessageWriter.MessagePosition pos = writer.checkAndSetWritePosition();
-				return new MsgCheckResult(pos.getPartIndex(), pos.getChunkIndex());
+				writer = queue.getOrOpenMessageWriter(cmd.getSenderQueueName(), cmd.getMsgId());
+				MessagePosition position = writer.checkPositionToWrite(cmd.getMsgId(), cmd.getPartNum());
+				return new MsgCheckResult(position.getPartIndex(), position.getChunkIndex());
 			}catch(IOException e){
 				TemporaryMessageException e1 = new TemporaryMessageException("Temporary Error Occurs; save message to queue("+queue.getName()+")", e); //TODO: ??现在简单处理，让客户端重试；正确做法应该是让客户端死信；
 				log.error(e1.getMessage(), e);
@@ -171,15 +163,20 @@ public class JettyTransport implements ServerTransport {
 				throws TemporaryMessageException, FatalMessageException{
 			MessageWriter writer;
 			try {
-				writer = queue.getOrOpenMessageWriter(cmd.getSenderQueue(), cmd.getMsgId());
+				writer = queue.getOrOpenMessageWriter(cmd.getSenderQueue(), 
+						cmd.getMsgId());
 			} catch (IOException e) {
-				TemporaryMessageException e1 = new TemporaryMessageException("Temporary Error Occurs; save message to queue("+queue.getName()+")", e); //TODO: ??现在简单处理，让客户端重试；正确做法应该是让客户端死信；
+				TemporaryMessageException e1 = new TemporaryMessageException("Temporary Error Occurs; cannot open MessageWriter; ("+queue.getName()+")", e); //TODO: ??现在简单处理，让客户端重试；正确做法应该是让客户端死信；
 				log.error(e1.getMessage(), e);
 				throw e1;
 			}
 			try{
-				writer.writeMeta(cmd.getMsgId(), StringUtils.string2List(cmd.getAttachmentNames()), cmd.getPartNum());
-				writer.writeChunk(cmd.getPartIndex(), cmd.getPartLength(), cmd.getChunkLen(), (InputStream)request.getInputStream());
+				if(!writer.isWritingMsg(cmd.getMsgId())){
+					writer.startNewMessage(cmd.getMsgId(), 
+							StringUtils.string2List(cmd.getAttachmentNames()), cmd.getPartNum());
+				}
+				writer.writeChunk(cmd.getPartIndex(), 
+						cmd.getPartLength(), cmd.getChunkOffset(), cmd.getChunkLen(), (InputStream)request.getInputStream());
 			}catch(IOException e){
 				TemporaryMessageException e1 = new TemporaryMessageException("Temporary Error Occurs; save message to queue("+queue.getName()+")", e); //TODO: ??现在简单处理，让客户端重试；正确做法应该是让客户端死信；
 				log.error(e1.getMessage(), e);

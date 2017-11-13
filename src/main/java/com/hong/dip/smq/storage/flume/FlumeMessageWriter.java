@@ -1,9 +1,10 @@
 package com.hong.dip.smq.storage.flume;
 
 import java.io.File;
-import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.RandomAccessFile;
+import java.util.ArrayList;
 import java.util.List;
 
 import org.slf4j.Logger;
@@ -12,15 +13,18 @@ import org.slf4j.LoggerFactory;
 import com.hong.dip.smq.storage.MessageWriter;
 import com.hong.dip.smq.transport.MessageCtrlException.FatalMessageException;
 import com.hong.dip.smq.transport.MessageCtrlException.TemporaryMessageException;
+import com.hong.dip.utils.StringUtils;
 
 public class FlumeMessageWriter implements MessageWriter {
 	static final Logger log = LoggerFactory.getLogger(FlumeMessageWriter.class);
 	FlumeQueueStorage queueStorage;
 	private String remoteQueue;
+	private File attachmentDir; //保存附件的目录
+
+	
 	private String msgId;
 	private List<String> attachmentNames;
 	private int partNum;
-	private File attachmentDir; //保存附件的目录
 	private AttachmentWriter attachmentWriter = new AttachmentWriter();
 	
 	public FlumeMessageWriter(FlumeQueueStorage queueStorage, File attachmentDir, String remoteQueue) {
@@ -33,23 +37,26 @@ public class FlumeMessageWriter implements MessageWriter {
 	public String getMessageId() {		// TODO Auto-generated method stub
 		return msgId;
 	}
+	@Override
+	public boolean isWritingMsg(String msgId){
+		return StringUtils.strEquals(msgId, this.msgId);
+	}
 	/* 
-	 * 由于我们最后保存消息体到Flume队列，所以写入msgID等metas时只需要在内存中记录就可以，无需序列化到磁盘
 	 */
 	@Override
-	public void writeMeta(String msgId, List<String> attachmentNames, int partNum) {
+	public void startNewMessage(String msgId, List<String> attachmentNames, int partNum) throws IOException {
 		this.msgId = msgId;
 		this.attachmentNames = attachmentNames;
 		this.partNum = partNum;
-		
+		this.attachmentWriter.closeCurrentPart();
 	}
 
 	
 	@Override
-	public void writeChunk(int partIndex, long partLength, int chunkLen, InputStream inputStream) 
+	public void writeChunk(int partIndex, long partLength, long chunkOffset, int chunkLen, InputStream inputStream) 
 			throws TemporaryMessageException, FatalMessageException {
 		if(partIndex < partNum - 1){ //if attachments;
-			writeAttachment(this.attachmentNames.get(partIndex), partIndex, chunkLen, inputStream);
+			writeAttachment(this.attachmentNames.get(partIndex), partIndex, partLength, chunkOffset, chunkLen, inputStream);
 		}else{//write body
 			writeBody(chunkLen, inputStream, partIndex, partNum); //write body to flumen queue and save message check point
 		}
@@ -58,6 +65,9 @@ public class FlumeMessageWriter implements MessageWriter {
 	private void writeBody(int chunkLen, InputStream inputStream, int partIndex, int partNum) throws TemporaryMessageException {
 		byte[] b;
 		try {
+			//在写入body之前，关闭Attachment
+			this.attachmentWriter.closeCurrentPart();
+			
 			b = readAll(chunkLen, inputStream);
 		} catch (IOException e) {
 			TemporaryMessageException e1 = new TemporaryMessageException(
@@ -69,6 +79,13 @@ public class FlumeMessageWriter implements MessageWriter {
 		FlumeMessageStorage msg= new FlumeMessageStorage();
 		msg.setID(this.msgId);
 		msg.setAttachmentNames(this.attachmentNames);
+		if(partIndex > 0){
+			List<String> attachmentPaths = new ArrayList<String>(partIndex);
+			for(int i = 0; i < partIndex; i++){
+				attachmentPaths.add(attachmentWriter.getAttachmentFile(i).getPath());
+			}
+			msg.setAttachmentPaths(attachmentPaths);
+		}
 		msg.getEvent().setBody(b);
 		
 		
@@ -86,10 +103,9 @@ public class FlumeMessageWriter implements MessageWriter {
 			try{
 				this.queueStorage.commit();
 			}catch(Exception e){
-				checkLog.restoreLog(remoteQueue);
+				checkLog.restoreLog(remoteQueue); //当队列提交失败的时候回复check日志，
 				throw e;
 			}
-			//TODO 目前的实现，在非常罕见的情况下，消息已经提交到队列，但是当前消息的checkLog没有写入，那么会导致消息内容重复。
 
 		} catch (Exception e) {
 			try {
@@ -117,6 +133,8 @@ public class FlumeMessageWriter implements MessageWriter {
 			off += readed;
 			len -= readed;
 		}
+		if(len != 0)
+			throw new IOException("Cannot read a complete chunk from inputstream; queue("+this.remoteQueue+") msgId("+this.msgId+")");
 		return b;
 	}
 
@@ -124,13 +142,14 @@ public class FlumeMessageWriter implements MessageWriter {
 	/**
 	 * @param attachmentName	 attachment names
 	 * @param partIndex			attachment's index;
+	 * @param chunkOffset		chunk在文件中的offset
 	 * @param chunkLen			chunkLen;
 	 * @param inputStream		chunk content
 	 * @throws IOException
 	 */
-	private void writeAttachment(String attachmentName, int partIndex, int chunkLen, InputStream inputStream) throws TemporaryMessageException{
+	private void writeAttachment(String attachmentName, int partIndex, long partLength, long chunkOffset, int chunkLen, InputStream inputStream) throws TemporaryMessageException{
 		try{
-			this.attachmentWriter.prepareForWrite(this.msgId, attachmentName, partIndex);
+			this.attachmentWriter.prepareForWrite(attachmentName, partIndex, partLength, chunkOffset);
 			this.attachmentWriter.writeChunk(chunkLen, inputStream);
 		}catch(IOException e){
 			TemporaryMessageException e1 = new TemporaryMessageException(
@@ -142,39 +161,54 @@ public class FlumeMessageWriter implements MessageWriter {
 
 
 	@Override
-	public MessagePosition checkAndSetWritePosition() throws IOException {
-		return attachmentWriter.checkAndSetWritePosition();
+	public MessagePosition checkPositionToWrite(String msgId,int partNum) throws IOException {
+		//发送方准备发送的消息与当前正在写入的消息不一样，那么根据check-log检查该消息是否已经写入成功了
+		//如果写入成功返回消息已经完整的Position。如果不成功，那么强制从消息的开始位置发送
+		//TODO	注意：由于当前check-log只记录最后一条成功的消息。如果要检查的消息不是check-log记录的最后一条消息，我们总是假设该消息是新的消息需要重新发送
+		
+		if(this.msgId == null || !this.msgId.equals(msgId)) { //
+			FlumeMessageCheckLog checkLog = this.queueStorage.getFlumeMessageCheckLog();
+			if(checkLog.checkIfBodySaved(remoteQueue, msgId)){
+				return new MessagePosition(partNum-1, -1); // ending positon of message's last part;
+			}else
+				return new MessagePosition(0, 0);
+		}
+		else
+			return attachmentWriter.checkAndSetWritePosition();
 	}
 
 	@Override
 	public void open() throws IOException {
-		// TODO Auto-generated method stub
-
 	}
 
 	@Override
 	public void close() {
-		// TODO Auto-generated method stub
-
 	}
 	
 	class AttachmentWriter {
 		File currFile = null;
-		FileOutputStream fos = null;
+		RandomAccessFile fos = null;
 		int currentPartIndex = -1; //正在写入的attachment的index
-		public void prepareForWrite(String msgId, String attachmentName, int partIndex) throws IOException{
+		long currentPartLength = 0; //当前part还剩余多少字节没有写入
+		long writedPartLength = 0;
+		public void prepareForWrite(String attachmentName, int partIndex, long partLength, long chunkOffset) throws IOException{
 			if(partIndex != currentPartIndex){
 				closeCurrentPart();
-				openPart(partIndex);
-				this.currentPartIndex = partIndex;
-				
+				openPart(partIndex, partLength, chunkOffset);
 			}
 		}
 		
-		private void openPart(int partIndex) throws IOException {
+		private void openPart(int partIndex, long partLength, long chunkOffset) throws IOException {
 			File attachment = this.getAttachmentFile(partIndex);
-			fos = new FileOutputStream(attachment);
+			StringUtils.ensureFileExists(attachment);
+			fos = new RandomAccessFile(attachment, "rw");
+			fos.seek(chunkOffset);
+			
 			currFile = attachment;
+			currentPartLength = partLength;
+			writedPartLength = chunkOffset;
+			
+			currentPartIndex = partIndex;
 		}
 		private void closeCurrentPart() throws IOException{
 			try{
@@ -182,6 +216,9 @@ public class FlumeMessageWriter implements MessageWriter {
 					fos.close();
 					fos = null;
 					currFile = null;
+					currentPartIndex = -1;
+					currentPartLength =  0;
+					writedPartLength = 0;
 				}
 			}catch(IOException e){
 				log.error("Error Occurs. Cannot close attachment file("+currFile+")", e);
@@ -197,22 +234,31 @@ public class FlumeMessageWriter implements MessageWriter {
 				left -= readed;
 			}
 			if(left !=  0){
-				throw new IOException("Error Occurs. Chunk InpuStream's length is not equals with chunkLen; remoteQueue("+remoteQueue+") message ("+msgId+")");
+				throw new IOException("Error Occurs. Chunk InpuStream's length is not equals with chunkLen; remoteQueue("+remoteQueue+") message ("+msgId+") chunk("+this.currFile+")");
+			}
+			writedPartLength += chunkLen;
+			if(writedPartLength >= this.currentPartLength){
+				this.closeCurrentPart();
+				if(writedPartLength > currentPartLength){
+					throw new IOException("Error Occurs. Attachment("
+						+ this.currFile+") received too many bytes("
+						+ writedPartLength+") than part-length("
+						+ currentPartLength+")");
+				}
 			}
 			
 		}
 
 		/**
-		 * 检查所有的part（包含attachment和body),返回确认无疑已经保存的part index , chunk index
-		 * @return
+		 * 根据磁盘存储的信息，重新核对消息的所有的part（包含attachment和body)，返回需要继续写入的Part的位置
+		 * @return	MessagePosition：需要写入内容的消息位置，如果当前消息完整MessagePosition的partIndex指向最后一个Part，chunkIndex　为-1;
 		 */
 		public MessagePosition checkAndSetWritePosition() throws IOException {
-			//关闭当前正在打开处理的Part因为我们检查时使用的是磁盘上的文件元数据信息，它和内存中的文件对象信息不一定一致。
+			//关闭当前正在打开处理的Part。准备根据磁盘存储信息核对消息内容
 			closeCurrentPart();  
 			long resultChunkIndex = checkChunkIndexOfPart(0);  
 			int resultPartIndex = 0;
 			for(int partIndex = 1; partIndex < partNum; partIndex++){
-				boolean partExist = false;
 				long chunkIndex = checkChunkIndexOfPart(partIndex);
 				if(chunkIndex == -2){ //no this part, prev part's check result is ok
 					break; //prev is ok

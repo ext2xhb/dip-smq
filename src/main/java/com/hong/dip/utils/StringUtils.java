@@ -18,6 +18,10 @@ import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+/**
+ * @author xuhb
+ *
+ */
 public final class StringUtils {
     public static final Map<String, Pattern> PATTERN_MAP = new HashMap<>();
     static {
@@ -218,10 +222,10 @@ public final class StringUtils {
         String servletMap = "";
         int idx = path.lastIndexOf('/');
         if (idx >= 0) {
-            servletMap = path.substring(idx);
+            servletMap = path.substring(idx+1);
         }
         if ("".equals(servletMap) || "".equals(path)) {
-            servletMap = "/";
+            servletMap = "";
         }
         return servletMap;
     }
@@ -259,7 +263,12 @@ public final class StringUtils {
 		}
 		return list;
 	}
-
+	public static void ensureFileExists(File file) throws IOException{
+		if(file.exists())
+			return;
+		else
+			mkEmptyFile(file);
+	}
 	public static void ensureDirExists(File dir) throws IOException{
 		if(dir.exists()){
 			if(dir.isDirectory())
@@ -383,6 +392,45 @@ public final class StringUtils {
 			return s1 == s2;
 		else
 			return s1.equals(s2);
+	}
+
+	public static FileOutputStream openFileOutputStream(File attachment, long offset) {
+		
+		return null;
+	}
+
+	public static boolean byteArrayEquals(byte[] bytes1, byte[] bytes2) {
+		if(bytes1 == null){
+			return bytes2 == null;
+		}else{
+			if(bytes2 == null)
+				return false;
+			if(bytes1.length == bytes2.length){
+				for(int i = 0; i < bytes1.length; i++)
+					if(bytes1[i] != bytes2[i])
+						return false;
+				return true;
+			}else
+				return false;
+		}
+	}
+
+	/**
+	 * create file
+	 * @param file file to create
+	 * @param size	created file size;
+	 * @param c		fill with character
+	 */
+	public static void touchFile(File file, int size, char c)throws IOException {
+		FileOutputStream fos = new FileOutputStream(file);
+		try{
+			for(int i = 0; i < size; i++){
+				fos.write(c);
+			}
+		}finally{
+			fos.getFD().sync();
+			fos.close();
+		}
 	}
 
 }

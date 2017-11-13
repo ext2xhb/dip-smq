@@ -60,6 +60,7 @@ public class FlumeQueueStorage extends ServiceSupport implements Queue, QueueSto
 	}
 	@Override
 	protected void doStart() throws Exception {
+		StringUtils.ensureDirExists(attachmentDir);
 		msgCheckLog.open();
 		FileChannel channel = new FileChannel();
 		channel.setName(qname);
@@ -67,7 +68,6 @@ public class FlumeQueueStorage extends ServiceSupport implements Queue, QueueSto
 		this.channel = channel;
 		this.channel.start();
 		flumeTransaction.set(null);;
-		StringUtils.ensureDirExists(attachmentDir);
 	}
 	@Override
 	protected void doStop() throws Exception {
@@ -105,7 +105,7 @@ public class FlumeQueueStorage extends ServiceSupport implements Queue, QueueSto
 		ensureTransaction();
 		try{
 			//set a sequence , stored in queue storage
-			msgStorage.setStoreSequence(this.newMessageSequence());
+			//msgStorage.setStoreSequence(this.newMessageSequence());
 			this.channel.put(msgStorage.getBodyContent(Event.class));
 			
 			this.msgSemaphore.release();
@@ -125,14 +125,14 @@ public class FlumeQueueStorage extends ServiceSupport implements Queue, QueueSto
 			msgSemaphore.tryAcquire();
 			msg = new FlumeMessageStorage(event);
 		}
-		long expired = System.currentTimeMillis() + (long)millis;
 		//if no message, try to waiting for new message in given time;
 		if(msg == null){
+			long expired = System.currentTimeMillis() + (long)millis;
 			long currTime;
 			while((currTime = System.currentTimeMillis()) < expired){
 				long wait = expired - currTime;
-				if(wait > 500) 
-					wait = 500;
+				if(wait > 1000) 
+					wait = 1000;
 				msgSemaphore.tryAcquire(wait, TimeUnit.MILLISECONDS);
 				try{
 					event = takeEvent();
@@ -145,18 +145,7 @@ public class FlumeQueueStorage extends ServiceSupport implements Queue, QueueSto
 				}
 			}
 		}
-		if(msg == null)
-			return null;
-		//附件文件不完整也返回消息（应用需要处理附件无法打开的情况）
-		//try{
-		msg.loadAttachments();
 		return msg;
-		//}catch(Exception e){
-		//	log.error("!!!!!!!!Taken Event cannot convert to message maybe lost data(" + this.getName()+")", e);
-		//	this.commit();
-			//TODO: 可能导致数据丢失，后续需要考虑严谨处理此错误（建议将此消息放入死信队列中）
-		//	throw e;
-		//}
 		
 	}
 	
@@ -177,22 +166,36 @@ public class FlumeQueueStorage extends ServiceSupport implements Queue, QueueSto
 	private void ensureTransaction() {
 		if(this.flumeTransaction.get() != null)
 			return;
-		else
+		else{
 			this.flumeTransaction.set(channel.getTransaction());
+			this.flumeTransaction.get().begin();
+		}
 		
 	}	@Override
 	public void commit() throws Exception {
+		try{
 		if(this.flumeTransaction.get() != null){
 			this.flumeTransaction.get().commit();
+			this.flumeTransaction.get().close();
 			this.flumeTransaction.set(null);
+		}
+		}catch(Exception e){
+			log.error("Failed to commit on Queue("+this.getName()+")", e);
+			throw e;
 		}
 		
 	}
 	@Override
 	public void rollback() throws Exception {
-		if(this.flumeTransaction.get() != null){
-			this.flumeTransaction.get().rollback();;
-			this.flumeTransaction.set(null);
+		try{
+			if(this.flumeTransaction.get() != null){
+				this.flumeTransaction.get().rollback();
+				this.flumeTransaction.get().close();
+				this.flumeTransaction.set(null);
+			}
+		}catch(Exception e){
+			log.error("Failed to rollback on Queue("+this.getName()+")", e);
+			throw e;
 		}
 	}
 	
@@ -204,7 +207,9 @@ public class FlumeQueueStorage extends ServiceSupport implements Queue, QueueSto
 	}
 	@Override
 	public String newMessageID() {
-		return UUID.randomUUID().toString();
+		return new StringBuilder(UUID.randomUUID().toString())
+				.append('-')
+				.append(Long.toString(newMessageSequence())).toString();
 	}
 	@Override
 	public long newMessageSequence() {

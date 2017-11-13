@@ -61,15 +61,19 @@ public class ChunkableEventDataSource implements ChunkableDataSource{
 		return new EventReader();
 	}
 	class EventReader implements ChunkReader{
-
+		boolean readed = false;
 		@Override
 		public ByteBuffer readChunk(ByteBuffer buffer) throws IOException {
-			return ByteBuffer.wrap(event.getBody());
+			if(!readed){
+				readed = true;
+				return ByteBuffer.wrap(event.getBody());
+				
+			}else
+				return null;
 		}
 
 		@Override
 		public void close() {
-				
 		}
 
 		@Override
@@ -81,6 +85,11 @@ public class ChunkableEventDataSource implements ChunkableDataSource{
 		public long getSize() throws IOException {
 			byte[] b = event.getBody();
 			return b == null ? 0 : b.length;
+		}
+
+		@Override
+		public long getReadedChunkOffset() {
+			return 0;
 		}
 		
 	}
