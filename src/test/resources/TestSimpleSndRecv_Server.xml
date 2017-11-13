@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+       xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+       xsi:schemaLocation="
+       http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans.xsd
+       http://camel.apache.org/schema/spring http://camel.apache.org/schema/spring/camel-spring.xsd
+    ">
+	<bean name="rNode" class = "com.hong.dip.smq.spring.SimpleQueueServerFactoryBean">
+		<property name="storageOptions" ref="rNode_Flume"/>
+		<property name="clientOptions" ref="rNode_HttpClient"/>
+		<property name="serverOptions" ref="rNode_Jetty"/>
+		
+	</bean>
+	
+	<bean name = "rNode_Flume" class = "com.hong.dip.smq.storage.flume.FlumeOptions">
+		<constructor-arg  value="./rnode_flume"/>
+	</bean>
+	<bean name = "rNode_HttpClient" class = "com.hong.dip.smq.transport.http.client.HttpClientOptions">
+		<property name="nodeName" value="rNode"/>
+	</bean>
+	<bean name = "rNode_Jetty" class = "com.hong.dip.smq.transport.http.server.JettyOptions">
+		<property name="port" value="8081"/>
+	</bean>
+	
+
+</beans>

@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+       xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+       xsi:schemaLocation="
+       http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans.xsd
+       http://camel.apache.org/schema/spring http://camel.apache.org/schema/spring/camel-spring.xsd
+    ">
+	<bean name="sNode" class = "com.hong.dip.smq.spring.SimpleQueueServerFactoryBean">
+		<property name="storageOptions" ref="sNode_Flume"/>
+		<property name="clientOptions" ref="sNode_HttpClient"/>
+<!-- 		<property name="serverOptions" ref="sNode_Jetty"/> -->
+		
+	</bean>
+	
+	<bean name = "sNode_Flume" class = "com.hong.dip.smq.storage.flume.FlumeOptions">
+		<constructor-arg value = "./snode_flume"/>
+		<property name="chunkSize" value = "3"></property>
+	</bean>
+	<bean name = "sNode_HttpClient" class = "com.hong.dip.smq.transport.http.client.HttpClientOptions">
+		<property name="nodeName" value="sNode"/>
+		<property name="soTimeOut" value="3600000"/>  <!-- 等待应答的超时时间，为了调试方便设置了较长的时间 -->
+		<property name="socketTimeout" value="3600000"/> <!-- 等待应答的超时时间，为了调试方便设置了较长的时间 -->
+		<property name="maxConnPerClient" value = "1"/>
+		<property name="maxConnection" value = "1"/>
+	</bean>
+<!-- 	<bean name = "sNode_Jetty" class = "com.hong.dip.smq.transport.http.server.JettyOptions"> -->
+<!-- 		<property name="port" value="8080"/> -->
+<!-- 	</bean> -->
+	
+
+</beans>
