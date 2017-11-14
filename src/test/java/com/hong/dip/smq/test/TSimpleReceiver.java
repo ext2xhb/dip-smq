@@ -57,6 +57,8 @@ public class TSimpleReceiver extends SpringTestSupport{
 		}
 		
 	}
-
+	public static void main(String[] args) throws Exception{
+		new TSimpleReceiver().testReceiveInfinite();
+	}
 
 }

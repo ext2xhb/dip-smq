@@ -40,20 +40,17 @@ public class TSimpleSender extends SpringTestSupport{
 		File chunk2 = prepareAttachmentFile("a_"+(chunkSize*2+1), chunkSize*2+1, 'a');
 
 		RemoteQueue senderQ = sNode.createRemoteQueue("Simple", new Node("rNode", "127.0.0.1", 8081));
-		int send = 3;
+	
 		while(true){
 			
 			Message mSend = senderQ.createMessage();
 			mSend.setByteBody("hello world".getBytes());
-			//mSend.addAttachment("chunk0", chunk0);
-			//mSend.addAttachment("chunk1", chunk1);
-			//mSend.addAttachment("chunk2", chunk2);
+			mSend.addAttachment("chunk0", chunk0);
+			mSend.addAttachment("chunk1", chunk1);
+			mSend.addAttachment("chunk2", chunk2);
 			
 			senderQ.putMessage(mSend);
 			senderQ.commit();
-			send--;
-			if(send == 0)
-				Thread.sleep(Long.MAX_VALUE);
 		}
 		
 	}
@@ -62,4 +59,8 @@ public class TSimpleSender extends SpringTestSupport{
 		StringUtils.touchFile(file, size, c);
 		return file;
 	}
+	public static void main(String[] args) throws Exception{
+		new TSimpleSender().testSendInfinite();
+	}
+
 }
