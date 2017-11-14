@@ -13,14 +13,7 @@ public class SimpleTest {
         ContextHandler context = new ContextHandler();
         context.setContextPath("/queue");
         context.setHandler(new HelloHandler("Root Hello"));
-        /*
-        ContextHandler contextFR = new ContextHandler("/fr");
-        contextFR.setHandler(new HelloHandler("Bonjoir"));
-
-        ContextHandler contextIT = new ContextHandler("/it");
-        contextIT.setHandler(new HelloHandler("Bongiorno"));
-	*/
-       
+ 
         ContextHandlerCollection contexts = new ContextHandlerCollection();
         contexts.addHandler(context);
       //  contexts.addHandler(contextFR);

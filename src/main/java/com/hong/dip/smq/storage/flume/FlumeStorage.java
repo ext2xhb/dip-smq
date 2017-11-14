@@ -25,6 +25,8 @@ public class FlumeStorage extends ServiceSupport implements Storage{
 			ConcurrentHashMap<String, FlumeQueueStorage>();
 	private FlumeOptions options;
 	private File attachmentDir;
+
+	String dataDir = "";
 	
 	public FlumeStorage(FlumeOptions options){
 		this.options = options;
@@ -35,7 +37,7 @@ public class FlumeStorage extends ServiceSupport implements Storage{
 		context.put(FileChannelConfiguration.CHECKPOINT_DIR, this.getCheckPointDir(options).getPath());
 		context.put(FileChannelConfiguration.BACKUP_CHECKPOINT_DIR,
 			this.getBackupDir(options).getPath());
-		context.put(FileChannelConfiguration.DATA_DIRS, this.getDataDir(options).getPath());
+		context.put(FileChannelConfiguration.DATA_DIRS, this.dataDir);//this.getDataDir(options).getPath());
 		context.put(FileChannelConfiguration.KEEP_ALIVE, String.valueOf(options.getPutWaitSeconds()));
 		context.put(FileChannelConfiguration.CAPACITY, String.valueOf(options.getDefaultQueueDepth()));
 		context.put(FileChannelConfiguration.TRANSACTION_CAPACITY,String.valueOf(options.getTransactionCapacity()));
@@ -50,9 +52,10 @@ public class FlumeStorage extends ServiceSupport implements Storage{
 	private File getCheckPointDir(FlumeOptions options) {
 		return new File(options.getStoragePath(), CHECKPOINT_DIR);
 	}
+	/*
 	private File getDataDir(FlumeOptions options) {
 		return new File(options.getStoragePath(), DATA_DIR);
-	}
+	}*/
 	private File getAttachmentDir() {
 		if(this.attachmentDir == null){
 			this.attachmentDir = new File(options.getStoragePath(), ATTACHMENT_DIR);
@@ -68,8 +71,16 @@ public class FlumeStorage extends ServiceSupport implements Storage{
 		dir = (this.getBackupDir(options));
 		StringUtils.ensureDirExists(dir);
 
-		dir = (this.getDataDir(options));
-		StringUtils.ensureDirExists(dir);
+		
+		File[] dataDirs = new File[3];// WLA 模式中的data的存放处
+		for (int i = 0; i < dataDirs.length; i++) {
+			dataDirs[i] = new File(options.getStoragePath(), DATA_DIR + (i + 1));
+			StringUtils.ensureDirExists(dataDirs[i]);
+			dataDir += dataDirs[i].getAbsolutePath() + ",";
+		}
+		
+		//dir = (this.getDataDir(options));
+		
 		dir = this.getAttachmentDir();
 		StringUtils.ensureDirExists(dir);
 

@@ -69,7 +69,7 @@ public class FlumeMessageStorage implements MessageStorage {
 	List<ChunkableDataSource> parts = new ArrayList<ChunkableDataSource>(2);
 	private long storeSequence;
 	
-	FlumeMessageStorage(){
+	public FlumeMessageStorage(){
 		body = new ChunkableEventDataSource("body", new SimpleEvent());
 		parts.add(body);
 		

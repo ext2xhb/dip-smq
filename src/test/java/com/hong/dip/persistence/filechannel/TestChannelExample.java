@@ -14,6 +14,8 @@ import org.apache.flume.conf.Configurables;
 import org.apache.flume.event.SimpleEvent;
 
 import com.google.common.io.Files;
+import com.hong.dip.smq.storage.MessageStorage;
+import com.hong.dip.smq.storage.flume.FlumeMessageStorage;
 import com.hong.dip.smq.storage.flume.FlumeOptions;
 import com.hong.dip.smq.storage.flume.FlumeQueueStorage;
 import com.hong.dip.smq.storage.flume.FlumeStorage;
@@ -126,12 +128,49 @@ public class TestChannelExample extends TestCase{
 		options.setTransactionCapacity(3);
 		options.setPutWaitSeconds(3);
 		options.setDefaultQueueDepth(10);
-		options.setTransactionCapacity(2);
+		options.setTransactionCapacity(10);
 		FlumeStorage flumeStorage = new FlumeStorage(options);
 		flumeStorage.start();
 		FlumeQueueStorage queueStorage = (FlumeQueueStorage)flumeStorage.getOrCreateQueueStorage("q1");
-		int size = consumeAll(queueStorage.getChannel());
-		System.out.println("consumed = " + size);
+		
+		for(int i = 0 ;  i< 3; i++){
+		execute(new Runnable(){
+
+			@Override
+			public void run() {
+				try{
+					FlumeMessageStorage msg = new FlumeMessageStorage();
+					queueStorage.offer(msg);
+					queueStorage.commit();
+				}catch(Exception e){
+					
+				}
+				
+			}
+			
+		});
+		}
+		execute(new Runnable(){
+
+			@Override
+			public void run() {
+				try {
+					while(true){
+						MessageStorage msg = queueStorage.take(Integer.MAX_VALUE);
+						if(msg != null)
+							queueStorage.commit();
+
+					}
+				} catch (Exception e) {
+					// TODO Auto-generated catch block
+					e.printStackTrace();
+				}//consumeAll(queueStorage.getChannel());
+			}
+			
+		});
+		
+		System.out.println("ok");
+		/*
 		Transaction transaction = queueStorage.getChannel().getTransaction();
 		transaction.begin();
 		queueStorage.getChannel().put(new SimpleEvent());
@@ -145,6 +184,19 @@ public class TestChannelExample extends TestCase{
 		queueStorage.getChannel().put(new SimpleEvent());
 		transaction.commit();
 		transaction.close();
+		*/
+	}
+	static void execute(Runnable run){
+		new Thread(run).start();
+	}
+	private static int consumeAll(FlumeQueueStorage queueStorage) throws Exception {
+		MessageStorage msg;
+		int size = 0;
+		while((msg = queueStorage.take(0)) != null){
+			queueStorage.commit();
+			size ++;
+		}
+		return size;
 	}
 
 	private static int consumeAll(FileChannel channel) {
@@ -154,8 +206,6 @@ public class TestChannelExample extends TestCase{
 		do{
 			Transaction t = channel.getTransaction();
 			t.begin();
-			e = channel.take();
-			e = channel.take();
 			e = channel.take();
 			if(e != null)
 				size++;

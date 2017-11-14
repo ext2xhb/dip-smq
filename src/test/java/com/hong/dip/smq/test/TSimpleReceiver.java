@@ -34,7 +34,6 @@ public class TSimpleReceiver extends SpringTestSupport{
 	public void testReceiveInfinite() throws Exception{
 		while(true){
 			Message mRecv = recvQ.getMessage(Integer.MAX_VALUE);
-			recvQ.commit();
 			System.out.println("msg received " + mRecv.getID());
 			assertTrue(StringUtils.byteArrayEquals(mRecv.getByteBody(), "hello world".getBytes()));
 			if(mRecv.getAttachments().size() == 3){
@@ -55,6 +54,7 @@ public class TSimpleReceiver extends SpringTestSupport{
 			}else{
 				log.error("attachment size != 3, msgid = " + mRecv.getID());
 			}
+			recvQ.commit();
 		}
 		
 	}
