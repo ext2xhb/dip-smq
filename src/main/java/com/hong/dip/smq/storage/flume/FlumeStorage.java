@@ -14,6 +14,7 @@ import com.hong.dip.smq.storage.Storage;
 import com.hong.dip.utils.StringUtils;
 
 public class FlumeStorage extends ServiceSupport implements Storage{
+	private static final String FLUME_DIR = File.separator + "flume";
 	final static Logger log = LoggerFactory.getLogger(FlumeStorage.class);
 	private static final String BACKUP_DIR = "backup";
 	private static final String CHECKPOINT_DIR = "chk";
@@ -28,16 +29,21 @@ public class FlumeStorage extends ServiceSupport implements Storage{
 
 	String dataDir = "";
 	
+	
 	public FlumeStorage(FlumeOptions options){
 		this.options = options;
-		this.attachmentDir = new File(options.getStoragePath(), ATTACHMENT_DIR);
+		this.attachmentDir = new File(options.__getStoragePath(), ATTACHMENT_DIR);
+	}
+	
+	public String getFlumeContextPath(){
+		return options.__getStoragePath() + FLUME_DIR;
 	}
 	private Context createContext(FlumeOptions options) {
 		Context context = new Context();
-		context.put(FileChannelConfiguration.CHECKPOINT_DIR, this.getCheckPointDir(options).getPath());
+		context.put(FileChannelConfiguration.CHECKPOINT_DIR, this.getCheckPointDir().getAbsolutePath());
 		context.put(FileChannelConfiguration.BACKUP_CHECKPOINT_DIR,
-			this.getBackupDir(options).getPath());
-		context.put(FileChannelConfiguration.DATA_DIRS, this.dataDir);//this.getDataDir(options).getPath());
+			this.getBackupDir().getAbsolutePath());
+		context.put(FileChannelConfiguration.DATA_DIRS, this.dataDir);
 		context.put(FileChannelConfiguration.KEEP_ALIVE, String.valueOf(options.getPutWaitSeconds()));
 		context.put(FileChannelConfiguration.CAPACITY, String.valueOf(options.getDefaultQueueDepth()));
 		context.put(FileChannelConfiguration.TRANSACTION_CAPACITY,String.valueOf(options.getTransactionCapacity()));
@@ -46,40 +52,34 @@ public class FlumeStorage extends ServiceSupport implements Storage{
 
 		
 	}
-	private File getBackupDir(FlumeOptions options) {
-		return new File(options.getStoragePath(), BACKUP_DIR);
+	private File getBackupDir() {
+		return new File(getFlumeContextPath(), BACKUP_DIR);
 	}
-	private File getCheckPointDir(FlumeOptions options) {
-		return new File(options.getStoragePath(), CHECKPOINT_DIR);
+	private File getCheckPointDir() {
+		return new File(getFlumeContextPath(), CHECKPOINT_DIR);
 	}
-	/*
-	private File getDataDir(FlumeOptions options) {
-		return new File(options.getStoragePath(), DATA_DIR);
-	}*/
+
 	private File getAttachmentDir() {
 		if(this.attachmentDir == null){
-			this.attachmentDir = new File(options.getStoragePath(), ATTACHMENT_DIR);
+			this.attachmentDir = new File(options.__getStoragePath(), ATTACHMENT_DIR);
 		}
 		return this.attachmentDir;
 	}
 	
-	private void prepareStorageBase(FlumeOptions options)  throws Exception{
-		File dir = (this.getCheckPointDir(options));
+	private void prepareStorageBase()  throws Exception{
+		File dir = (this.getCheckPointDir());
 		StringUtils.ensureDirExists(dir);
 		
 
-		dir = (this.getBackupDir(options));
+		dir = (this.getBackupDir());
 		StringUtils.ensureDirExists(dir);
 
-		
-		File[] dataDirs = new File[3];// WLA 模式中的data的存放处
-		for (int i = 0; i < dataDirs.length; i++) {
-			dataDirs[i] = new File(options.getStoragePath(), DATA_DIR + (i + 1));
-			StringUtils.ensureDirExists(dataDirs[i]);
-			dataDir += dataDirs[i].getAbsolutePath() + ",";
+		for (int i = 0; i < 3; i++) {
+			dir = new File(this.getFlumeContextPath(), DATA_DIR + (i + 1));
+			StringUtils.ensureDirExists(dir);
+			dataDir += dir.getAbsolutePath() + ",";
 		}
-		
-		//dir = (this.getDataDir(options));
+		dataDir = dataDir.substring(0, dataDir.length() - 1);
 		
 		dir = this.getAttachmentDir();
 		StringUtils.ensureDirExists(dir);
@@ -118,7 +118,7 @@ public class FlumeStorage extends ServiceSupport implements Storage{
 	}
 	@Override
 	protected void doStart() throws Exception {
-		prepareStorageBase(options);
+		prepareStorageBase();
 		context = createContext(options);
 	}
 	@Override

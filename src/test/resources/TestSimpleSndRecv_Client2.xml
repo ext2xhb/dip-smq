@@ -20,8 +20,8 @@
 		<property name="nodeName" value="sNode2"/>
 		<property name="soTimeOut" value="3600000"/>  <!-- 等待应答的超时时间，为了调试方便设置了较长的时间 -->
 		<property name="socketTimeout" value="3600000"/> <!-- 等待应答的超时时间，为了调试方便设置了较长的时间 -->
-		<property name="maxConnPerClient" value = "1"/>
-		<property name="maxConnection" value = "1"/>
+		<property name="maxConnPerClient" value = "1"/> <!-- 设置为一个很小的值，方便测试阶段发现错误-->
+		<property name="maxConnection" value = "1"/> <!-- 设置为一个很小的值，方便测试阶段发现错误-->
 	</bean>
 <!-- 	<bean name = "sNode_Jetty" class = "com.hong.dip.smq.transport.http.server.JettyOptions"> -->
 <!-- 		<property name="port" value="8080"/> -->

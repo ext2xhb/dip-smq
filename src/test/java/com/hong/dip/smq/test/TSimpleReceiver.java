@@ -1,5 +1,6 @@
 package com.hong.dip.smq.test;
 
+import org.apache.log4j.PropertyConfigurator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -19,6 +20,7 @@ public class TSimpleReceiver extends SpringTestSupport{
 		return new String[]{"TestSimpleSndRecv_Server.xml"};
 	}
 	public TSimpleReceiver() throws Exception{
+		PropertyConfigurator.configure(this.getClass().getClassLoader().getResource("log4jRecv.properties").toURI().toURL());
 		this.getSpringContext();
 		rNode = getQServer("rNode");
 

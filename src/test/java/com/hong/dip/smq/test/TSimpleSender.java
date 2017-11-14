@@ -3,6 +3,8 @@ package com.hong.dip.smq.test;
 import java.io.File;
 import java.io.IOException;
 
+import org.apache.log4j.PropertyConfigurator;
+
 import com.hong.dip.smq.Message;
 import com.hong.dip.smq.Node;
 import com.hong.dip.smq.Queue;
@@ -12,7 +14,7 @@ import com.hong.dip.smq.storage.flume.FlumeOptions;
 import com.hong.dip.utils.StringUtils;
 
 public class TSimpleSender extends SpringTestSupport{
-
+	
 	QueueServer sNode;
 	
 	Queue recvQ;
@@ -21,6 +23,8 @@ public class TSimpleSender extends SpringTestSupport{
 		return new String[]{"TestSimpleSndRecv_Client.xml"};
 	}
 	public TSimpleSender() throws Exception{
+		PropertyConfigurator.configure(this.getClass().getClassLoader().getResource("log4jSender.properties").toURI().toURL());
+
 		this.getSpringContext();
 		sNode = getQServer("sNode");
 	}
@@ -36,6 +40,7 @@ public class TSimpleSender extends SpringTestSupport{
 		File chunk2 = prepareAttachmentFile("a_"+(chunkSize*2+1), chunkSize*2+1, 'a');
 
 		RemoteQueue senderQ = sNode.createRemoteQueue("Simple", new Node("rNode", "127.0.0.1", 8081));
+		int send = 3;
 		while(true){
 			
 			Message mSend = senderQ.createMessage();
@@ -46,6 +51,9 @@ public class TSimpleSender extends SpringTestSupport{
 			
 			senderQ.putMessage(mSend);
 			senderQ.commit();
+			send--;
+			if(send == 0)
+				Thread.sleep(Long.MAX_VALUE);
 		}
 		
 	}

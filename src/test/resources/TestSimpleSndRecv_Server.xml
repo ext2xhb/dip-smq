@@ -14,9 +14,11 @@
 	
 	<bean name = "rNode_Flume" class = "com.hong.dip.smq.storage.flume.FlumeOptions">
 		<constructor-arg  value="./rnode_flume"/>
+		<property name="chunkSize" value = "3"></property>
 	</bean>
 	<bean name = "rNode_HttpClient" class = "com.hong.dip.smq.transport.http.client.HttpClientOptions">
 		<property name="nodeName" value="rNode"/>
+		
 	</bean>
 	<bean name = "rNode_Jetty" class = "com.hong.dip.smq.transport.http.server.JettyOptions">
 		<property name="port" value="8081"/>

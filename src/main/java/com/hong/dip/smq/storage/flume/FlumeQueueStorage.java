@@ -174,11 +174,11 @@ public class FlumeQueueStorage extends ServiceSupport implements Queue, QueueSto
 	}	@Override
 	public void commit() throws Exception {
 		try{
-		if(this.flumeTransaction.get() != null){
-			this.flumeTransaction.get().commit();
-			this.flumeTransaction.get().close();
-			this.flumeTransaction.set(null);
-		}
+			if(this.flumeTransaction.get() != null){
+				this.flumeTransaction.get().commit();
+				this.flumeTransaction.get().close();
+				this.flumeTransaction.set(null);
+			}
 		}catch(Exception e){
 			log.error("Failed to commit on Queue("+this.getName()+")", e);
 			throw e;

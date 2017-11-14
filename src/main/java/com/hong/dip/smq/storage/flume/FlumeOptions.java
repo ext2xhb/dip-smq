@@ -1,6 +1,9 @@
 package com.hong.dip.smq.storage.flume;
 
+import java.io.File;
+
 public class FlumeOptions {
+	
 	private String storagePath;
 	private int putWaitSeconds = 3; //time wait for queue space available 
 	private int defaultQueueDepth = 100000;
@@ -10,7 +13,7 @@ public class FlumeOptions {
 		this.storagePath = storagePath;
 	}
 	
-	public String getStoragePath() {
+	public String __getStoragePath() {
 		return storagePath;
 	}
 
