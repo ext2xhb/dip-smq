@@ -45,9 +45,9 @@ public class TSimpleSender extends SpringTestSupport{
 			
 			Message mSend = senderQ.createMessage();
 			mSend.setByteBody("hello world".getBytes());
-			mSend.addAttachment("chunk0", chunk0);
-			mSend.addAttachment("chunk1", chunk1);
-			mSend.addAttachment("chunk2", chunk2);
+			//mSend.addAttachment("chunk0", chunk0);
+			//mSend.addAttachment("chunk1", chunk1);
+			//mSend.addAttachment("chunk2", chunk2);
 			
 			senderQ.putMessage(mSend);
 			senderQ.commit();

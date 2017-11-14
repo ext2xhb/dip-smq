@@ -24,7 +24,7 @@ public class FlumeMessageStorage implements MessageStorage {
 	private static final String HEADER_ATTACHMENT_PATH = "paths";
 	private static final String HEADER_SEQUENCE = "seq";
 	
-	static MessageStorage cast2Storage(Message m){
+	public static MessageStorage cast2Storage(Message m){
 		FlumeMessageStorage storage = new FlumeMessageStorage();
 		
 		Event event = storage.getEvent();
@@ -48,7 +48,7 @@ public class FlumeMessageStorage implements MessageStorage {
 		return storage;
 	}
 	
-	static Message cast2Message(MessageStorage storage) {
+	public static Message cast2Message(MessageStorage storage) {
 		Message m = new SimpleMessage();
 		m.setID(storage.getID());
 		m.setByteBody(((FlumeMessageStorage)storage).getEvent().getBody());

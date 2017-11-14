@@ -73,13 +73,16 @@ public class FlumeStorage extends ServiceSupport implements Storage{
 
 		dir = (this.getBackupDir());
 		StringUtils.ensureDirExists(dir);
-
+		/*
 		for (int i = 0; i < 3; i++) {
 			dir = new File(this.getFlumeContextPath(), DATA_DIR + (i + 1));
 			StringUtils.ensureDirExists(dir);
 			dataDir += dir.getAbsolutePath() + ",";
 		}
 		dataDir = dataDir.substring(0, dataDir.length() - 1);
+		*/
+		dataDir = new File(this.getFlumeContextPath(), DATA_DIR).getAbsolutePath();
+		StringUtils.ensureDirExists(new File(dataDir));
 		
 		dir = this.getAttachmentDir();
 		StringUtils.ensureDirExists(dir);

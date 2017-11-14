@@ -25,9 +25,6 @@ public class TSimpleReceiver extends SpringTestSupport{
 		rNode = getQServer("rNode");
 
 		recvQ = rNode.createQueue("Simple");
-		while(recvQ.getStorage().take(0) != null){
-			recvQ.commit();
-		}
 	}
 	
 	QueueServer getQServer(String node){

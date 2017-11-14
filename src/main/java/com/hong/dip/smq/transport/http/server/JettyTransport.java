@@ -11,9 +11,12 @@ import org.eclipse.jetty.server.handler.AbstractHandler;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.hong.dip.smq.Message;
+import com.hong.dip.smq.storage.MessageStorage;
 import com.hong.dip.smq.storage.MessageWriter;
 import com.hong.dip.smq.storage.MessageWriter.MessagePosition;
 import com.hong.dip.smq.storage.QueueStorage;
+import com.hong.dip.smq.storage.flume.FlumeQueueStorage;
 import com.hong.dip.smq.transport.MessageCtrlException.FatalMessageException;
 import com.hong.dip.smq.transport.MessageCtrlException.TemporaryMessageException;
 import com.hong.dip.smq.transport.ServerTransport;
@@ -44,8 +47,6 @@ public class JettyTransport implements ServerTransport {
 	public void stop() throws Exception {
 		server.stop();
 	}
-
-	@Override
 	public void startMessageReceiver(QueueStorage queue) throws Exception {
 		try{
 			server.addServant(
@@ -55,6 +56,8 @@ public class JettyTransport implements ServerTransport {
 			throw e;
 		}
 	}
+
+
 	@Override
 	public void stopMessageReceiver(QueueStorage queue) {
 		try{
@@ -101,7 +104,6 @@ public class JettyTransport implements ServerTransport {
 								new StringBuilder(e.getMessage()).append(" cause:").append(e.getCause().getMessage()).toString());
 							return;
 					}
-					
 					break;
 				case MSG_CHECK_MSG:
 					try {
