@@ -155,9 +155,11 @@ class JettyServer extends ServiceSupport{
                 }
             } finally {
                 if (contexts != null) {
-                    for (Handler h : contexts.getHandlers()) {
-                        h.stop();
-                    }
+                	if(contexts.getHandlers() != null){
+	                    for (Handler h : contexts.getHandlers()) {
+	                        h.stop();
+	                    }
+                	}
                     contexts.stop();
                 }
                 contexts = null;
