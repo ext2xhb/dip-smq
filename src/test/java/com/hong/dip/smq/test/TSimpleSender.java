@@ -40,15 +40,15 @@ public class TSimpleSender extends SpringTestSupport{
 		File chunk2 = prepareAttachmentFile("a_"+(chunkSize*2+1), chunkSize*2+1, 'a');
 
 		RemoteQueue senderQ = sNode.createRemoteQueue("Simple", new Node("rNode", "127.0.0.1", 8081));
-	
 		while(true){
 			
 			Message mSend = senderQ.createMessage();
+			
 			mSend.setByteBody("hello world".getBytes());
 			mSend.addAttachment("chunk0", chunk0);
 			mSend.addAttachment("chunk1", chunk1);
 			mSend.addAttachment("chunk2", chunk2);
-			
+
 			senderQ.putMessage(mSend);
 			senderQ.commit();
 		}

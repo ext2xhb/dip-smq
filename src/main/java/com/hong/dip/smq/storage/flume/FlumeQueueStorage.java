@@ -15,6 +15,7 @@ import org.apache.flume.Context;
 import org.apache.flume.Event;
 import org.apache.flume.Transaction;
 import org.apache.flume.channel.file.FileChannel;
+import org.apache.flume.channel.file.FileChannelConfiguration;
 import org.apache.flume.conf.Configurables;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -30,22 +31,27 @@ import com.hong.dip.utils.StringUtils;
 public class FlumeQueueStorage extends ServiceSupport implements Queue, QueueStorage {
 	static final Logger log = LoggerFactory.getLogger(FlumeQueueStorage.class);
 	private static final String FILE_CHECK_LOG = "___check_log___";
+	private static final String BACKUP_DIR = "backup";
+	private static final String CHECKPOINT_DIR = "chk";
+	private static final String DATA_DIR = "data";
+
 	private FileChannel channel;
 	private ThreadLocal<Transaction> flumeTransaction = new ThreadLocal<Transaction>();
 	
 	private String qname;
-	private Context context;
+	private Context flumeContext;
 	private File attachmentDir;
+	private File flumeContextPath; //flume context的目录
 	private AtomicLong messageSequnce = new AtomicLong();
 	private Semaphore msgSemaphore = new Semaphore(0); //只是优化take的等待时间，不能严格依赖该信号进行同步控制
 	private FlumeOptions options;
 	private Map<String, MessageWriter> messageWriters = new ConcurrentHashMap<String, MessageWriter>();
 	private FlumeMessageCheckLog msgCheckLog;
 	
-	public FlumeQueueStorage(FlumeOptions options, File attachmentDir, String qname, Context context){
+	public FlumeQueueStorage(FlumeOptions options, File attachmentDir, String qname, File storagePath){
 		this.options = options;
 		this.qname = qname;
-		this.context = context;
+		this.flumeContextPath = new File(storagePath, qname);
 		this.attachmentDir = attachmentDir;
 		msgCheckLog = new FlumeMessageCheckLog(new File(attachmentDir, FILE_CHECK_LOG));
 	}
@@ -60,14 +66,38 @@ public class FlumeQueueStorage extends ServiceSupport implements Queue, QueueSto
 	}
 	@Override
 	protected void doStart() throws Exception {
+		//create flume context 
+		this.flumeContext = createFlumeContext(this.flumeContextPath);
+		//create attachment dir
 		StringUtils.ensureDirExists(attachmentDir);
-		msgCheckLog.open();
+		
+		msgCheckLog.open(); //check log is stored in attachmentDir(临时方案）
 		FileChannel channel = new FileChannel();
 		channel.setName(qname);
-		Configurables.configure(channel, context);
+		Configurables.configure(channel, flumeContext);
 		this.channel = channel;
 		this.channel.start();
-		flumeTransaction.set(null);;
+		flumeTransaction.set(null);
+		
+	}
+	private Context createFlumeContext(File flumeContextPath) throws IOException{
+		File checkDir = new File(this.flumeContextPath, CHECKPOINT_DIR);
+		StringUtils.ensureDirExists(checkDir);
+		File backupDir = new File(this.flumeContextPath, BACKUP_DIR);
+		StringUtils.ensureDirExists(backupDir);
+		File dataDir = new File(this.flumeContextPath, DATA_DIR);
+		StringUtils.ensureDirExists(dataDir);
+		
+		Context context = new Context();
+		context.put(FileChannelConfiguration.CHECKPOINT_DIR, checkDir.getAbsolutePath());
+		context.put(FileChannelConfiguration.BACKUP_CHECKPOINT_DIR,
+			backupDir.getAbsolutePath());
+		context.put(FileChannelConfiguration.DATA_DIRS, dataDir.getAbsolutePath());
+		context.put(FileChannelConfiguration.KEEP_ALIVE, String.valueOf(options.getPutWaitSeconds()));
+		context.put(FileChannelConfiguration.CAPACITY, String.valueOf(options.getDefaultQueueDepth()));
+		context.put(FileChannelConfiguration.TRANSACTION_CAPACITY,String.valueOf(options.getTransactionCapacity()));
+		
+		return context;
 	}
 	@Override
 	protected void doStop() throws Exception {

@@ -71,6 +71,12 @@ public class FileChannelExample2 {
 		Context context = createFileChannelContext(checkpointDir, dataDir,
 				backupDir, overrides);
 		Configurables.configure(channel, context);
+		channel.start();
+		
+		channel = new FileChannel();
+		channel.setName("FileChannel-" + UUID.randomUUID());
+		Configurables.configure(channel, context);
+		channel.start();
 		return channel;
 	}
 
