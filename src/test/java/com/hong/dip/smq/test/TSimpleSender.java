@@ -6,6 +6,8 @@ import java.io.IOException;
 import org.apache.log4j.PropertyConfigurator;
 
 import com.hong.dip.smq.Message;
+import com.hong.dip.smq.MessagePostHandler;
+import com.hong.dip.smq.MessageReason;
 import com.hong.dip.smq.Node;
 import com.hong.dip.smq.Queue;
 import com.hong.dip.smq.QueueServer;
@@ -39,7 +41,13 @@ public class TSimpleSender extends SpringTestSupport{
 		File chunk1 = prepareAttachmentFile("a_"+chunkSize*2, chunkSize*2, 'a');
 		File chunk2 = prepareAttachmentFile("a_"+(chunkSize*2+1), chunkSize*2+1, 'a');
 
-		RemoteQueue senderQ = sNode.createRemoteQueue("Simple", new Node("rNode", "127.0.0.1", 8081));
+		RemoteQueue senderQ = sNode.createRemoteQueue("Simple", new Node("rNode", "127.0.0.1", 8081),
+			new MessagePostHandler(){
+				public boolean needFullMessage() {return true;}
+				public void handle(MessageReason reason, Message msg) {
+					System.out.println("message ("+msg.getID()+") sended"); 
+				}
+			});
 		while(true){
 			
 			Message mSend = senderQ.createMessage();

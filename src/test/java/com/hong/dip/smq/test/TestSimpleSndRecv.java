@@ -4,6 +4,8 @@ import java.io.File;
 import java.io.IOException;
 
 import com.hong.dip.smq.Message;
+import com.hong.dip.smq.MessagePostHandler;
+import com.hong.dip.smq.MessageReason;
 import com.hong.dip.smq.Node;
 import com.hong.dip.smq.Queue;
 import com.hong.dip.smq.QueueServer;
@@ -37,7 +39,19 @@ public class TestSimpleSndRecv extends SpringTestSupport{
 	}
 	public void _testSimpleSendReceive() throws Exception{
 		RemoteQueue senderQ = 
-				sNode.createRemoteQueue("Simple", new Node("rNode", "127.0.0.1", 8081));
+				sNode.createRemoteQueue("Simple", new Node("rNode", "127.0.0.1", 8081), new MessagePostHandler(){
+
+					@Override
+					public boolean needFullMessage() {
+						return true;
+					}
+
+					@Override
+					public void handle(MessageReason reason, Message msg) {
+						System.out.println("message ("+msg.getID()+") sended"); 
+					}
+					
+				});
 		
 		while(senderQ.getStorage().take(0) != null){
 			senderQ.commit();
@@ -70,7 +84,7 @@ public class TestSimpleSndRecv extends SpringTestSupport{
 	public void testSimpleAttachment() throws Exception{
 		int chunkSize = this.getSpringContext().getBean("sNode2_Flume", FlumeOptions.class).getChunkSize();
 		RemoteQueue senderQ2 = 
-				sNode2.createRemoteQueue("Simple", new Node("rNode", "127.0.0.1", 8081));
+				sNode2.createRemoteQueue("Simple", new Node("rNode", "127.0.0.1", 8081), null);
 		
 		while(senderQ2.getStorage().take(0) != null){
 			senderQ2.commit();

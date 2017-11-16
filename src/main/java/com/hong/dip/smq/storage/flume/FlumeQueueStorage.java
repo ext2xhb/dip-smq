@@ -21,6 +21,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.hong.dip.smq.Message;
+import com.hong.dip.smq.MessagePostHandler;
 import com.hong.dip.smq.Queue;
 import com.hong.dip.smq.SimpleMessage;
 import com.hong.dip.smq.storage.MessageStorage;
@@ -47,6 +48,7 @@ public class FlumeQueueStorage extends ServiceSupport implements Queue, QueueSto
 	private FlumeOptions options;
 	private Map<String, MessageWriter> messageWriters = new ConcurrentHashMap<String, MessageWriter>();
 	private FlumeMessageCheckLog msgCheckLog;
+	private MessagePostHandler handler;
 	
 	public FlumeQueueStorage(FlumeOptions options, File attachmentDir, String qname, File storagePath){
 		this.options = options;
@@ -296,6 +298,14 @@ public class FlumeQueueStorage extends ServiceSupport implements Queue, QueueSto
 	}
 	public FlumeMessageCheckLog getFlumeMessageCheckLog() {
 		return this.msgCheckLog;
+	}
+	@Override
+	public void setMessagePostHandler(MessagePostHandler handler) {
+		this.handler = handler;
+	}
+	@Override
+	public MessagePostHandler getMessagePostHandler() {
+		return this.handler;
 	}
 
 

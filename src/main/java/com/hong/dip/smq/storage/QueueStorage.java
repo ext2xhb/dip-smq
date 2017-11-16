@@ -5,6 +5,7 @@ import java.io.IOException;
 import org.apache.camel.Service;
 
 import com.hong.dip.smq.Message;
+import com.hong.dip.smq.MessagePostHandler;
 import com.hong.dip.smq.Queue;
 
 /**
@@ -43,6 +44,9 @@ public interface QueueStorage extends Service{
 	public MessageWriter getOrOpenMessageWriter(String remoteQueue, String msgId) throws IOException;
 
 	public MessageWriter getCurrentMessageWriter(String remoteQueue);
+
+	public void setMessagePostHandler(MessagePostHandler handler);
+	public MessagePostHandler getMessagePostHandler();
 	
 
 }

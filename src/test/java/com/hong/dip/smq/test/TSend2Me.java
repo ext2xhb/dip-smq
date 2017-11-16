@@ -8,6 +8,8 @@ import org.slf4j.LoggerFactory;
 
 import com.hong.dip.smq.ChunkableDataSource;
 import com.hong.dip.smq.Message;
+import com.hong.dip.smq.MessagePostHandler;
+import com.hong.dip.smq.MessageReason;
 import com.hong.dip.smq.Node;
 import com.hong.dip.smq.Queue;
 import com.hong.dip.smq.QueueServer;
@@ -31,7 +33,19 @@ public class TSend2Me extends SpringTestSupport{
 		rNode = getQServer("rNode");
 
 		recvQ = rNode.createQueue("Simple");
-		sendQueue = rNode.createRemoteQueue("Simple", new Node("rNode", "127.0.0.1", 8081));
+		sendQueue = rNode.createRemoteQueue("Simple", new Node("rNode", "127.0.0.1", 8081),
+			new MessagePostHandler(){
+				@Override
+				public boolean needFullMessage() {
+					return true;
+				}
+	
+				@Override
+				public void handle(MessageReason reason, Message msg) {
+					System.out.println("message ("+msg.getID()+") sended"); 
+				}
+			
+			});
 	}
 	
 	QueueServer getQServer(String node){
@@ -75,6 +89,18 @@ public class TSend2Me extends SpringTestSupport{
 		
 	}
 	public static void main(String[] args) throws Exception{
+		new Thread(new Runnable(){
+
+			@Override
+			public void run() {
+				try{
+				new TSend2Me().testSendInfinite();
+				}catch(Exception e){
+					e.printStackTrace();;
+				}
+			}
+			
+		}).start();
 		new TSend2Me().testReceiveInfinite();
 	}
 

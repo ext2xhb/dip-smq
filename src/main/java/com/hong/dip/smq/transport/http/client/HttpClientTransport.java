@@ -12,8 +12,12 @@ import org.slf4j.LoggerFactory;
 
 import com.hong.dip.smq.ChunkableDataSource;
 import com.hong.dip.smq.ChunkableDataSource.ChunkReader;
+import com.hong.dip.smq.Message;
+import com.hong.dip.smq.MessagePostHandler;
+import com.hong.dip.smq.MessageReason;
 import com.hong.dip.smq.Node;
 import com.hong.dip.smq.RemoteQueue;
+import com.hong.dip.smq.SimpleMessage;
 import com.hong.dip.smq.storage.MessageStorage;
 import com.hong.dip.smq.storage.QueueStorage;
 import com.hong.dip.smq.storage.flume.FlumeMessageStorage;
@@ -119,6 +123,7 @@ public class HttpClientTransport extends ServiceSupport implements ClientTranspo
 					else
 						sendMessage(msg, 0, 0);
 					commitStorage();
+					notifyPostHandler(MessageReason.Finished, msg);
 					mayDuplicated = false;
 				} catch (TemporaryMessageException e) {
 					log.error("Temporary Error Occurs while sending  message. id ("+msg.getID()+") cause: " + e.getCause(), e);
@@ -127,10 +132,32 @@ public class HttpClientTransport extends ServiceSupport implements ClientTranspo
 					try { Thread.sleep(3000); } catch (InterruptedException e1) {}
 					mayDuplicated = true;
 				} catch (FatalMessageException e) {
-					// TODO: 以后需要添加到死信队列。目前暂时只记录日志
+					notifyPostHandler(MessageReason.Dead_InvalideContent, msg);
 					log.error("Fatal Error Occurs while sending  message. id ("+msg.getID()+") cause: " + e.getCause(), e);
 					commitStorage();
 					mayDuplicated = false;
+				}
+			}
+		}
+
+		private void notifyPostHandler(MessageReason reason, MessageStorage msg) {
+			MessagePostHandler handler = storage.getMessagePostHandler();
+			if(handler != null){
+				boolean fullMessage = 
+					reason == MessageReason.Finished ? handler.needFullMessage() : true;
+						
+				if(fullMessage){
+					handler.handle(MessageReason.Finished, storage.storageToMessage(msg));
+				}else{
+					Message m = new SimpleMessage();
+					m.setID(msg.getID());
+					for(int i = 1; i < msg.getParts().size();i++){
+						try{
+							m.addAttachment(msg.getParts().get(i));
+						}catch(IOException e){
+						}
+					}
+					handler.handle(MessageReason.Finished, m);
 				}
 			}
 		}

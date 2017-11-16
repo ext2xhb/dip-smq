@@ -4,6 +4,7 @@ import org.apache.camel.support.ServiceSupport;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.hong.dip.smq.MessagePostHandler;
 import com.hong.dip.smq.Node;
 import com.hong.dip.smq.Queue;
 import com.hong.dip.smq.QueueServer;
@@ -74,11 +75,12 @@ public class SimpleQueueServer extends ServiceSupport implements QueueServer{
 	}
 
 	@Override
-	public RemoteQueue createRemoteQueue(String qname, Node node) throws Exception {
+	public RemoteQueue createRemoteQueue(String qname, Node node, MessagePostHandler handler) throws Exception {
 		try{
 		//发送队列名是本地节点名+队列名
 		QueueStorage queue = this.storage.getOrCreateQueueStorage(
 				nodeName + "_" + qname);
+		queue.setMessagePostHandler(handler);
 		RemoteQueue rQueue = new RemoteQueue(node, qname, queue);
 		clientTransport.startMessageSender(rQueue, queue);
 		return rQueue;

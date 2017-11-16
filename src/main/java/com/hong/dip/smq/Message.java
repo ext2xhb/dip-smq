@@ -8,7 +8,6 @@ public interface Message {
 
 	void setID(String msgId);
 	String getID();
-
 	byte[] getByteBody();
 
 	void setByteBody(byte[] byteBody);
